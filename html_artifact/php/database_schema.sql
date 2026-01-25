@@ -137,10 +137,3 @@ INSERT INTO menu_items (name, category_id, price, description, image_url, rating
 -- Vanilla Cakes
 ('Vanilla Bean Cake', 6, 34.90, 'Classic vanilla cake with vanilla bean buttercream and fresh strawberries', 'https://p26-doubao-search-sign.byteimg.com/tos-cn-i-be4g95zd3a/981088101005787235~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1784060534&x-signature=x3H6d%2FAeTJM0syEI5r%2BXplwJ580%3D', 4.6, 155, TRUE),
 ('Vanilla Sponge Cake', 6, 32.90, 'Light and fluffy vanilla sponge cake served with vanilla pods and fresh mint', 'https://p3-doubao-search-sign.byteimg.com/labis/f725f3a7dcda035ed535135fa6c8e22a~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1784060534&x-signature=9lB4nLoq7tNlydp9XhDm8RvHTIo%3D', 4.5, 142, TRUE);
-
--- Placeholder order for default user with zero total
-INSERT INTO orders (user_id, total_amount, recipient_name, recipient_phone, recipient_address, delivery_date, delivery_time, special_instructions, status, payment_status)
-VALUES ((SELECT id FROM users WHERE username = 'user'), 0.00, 'Test User', '0000000000', 'Sample Address', CURDATE(), 'Standard', 'Placeholder order', 'pending', 'unpaid');
-
-INSERT INTO order_items (order_id, menu_item_id, quantity, price)
-VALUES (LAST_INSERT_ID(), 1, 1, 0.00);

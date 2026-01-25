@@ -796,6 +796,203 @@ try {
             `;
         }
 
+        // Load data from database
+        async function loadDataFromDatabase() {
+            try {
+                // Simulate API calls to get data from database
+                // In a real application, these would be actual AJAX calls to PHP endpoints
+                
+                // Load orders
+                await loadOrdersFromDatabase();
+                
+                // Load products
+                await loadProductsFromDatabase();
+                
+                // Load users
+                await loadUsersFromDatabase();
+                
+                // Load admins
+                await loadAdminsFromDatabase();
+                
+                // Load categories
+                await loadCategoriesFromDatabase();
+                
+                console.log('All data loaded successfully');
+            } catch (error) {
+                console.error('Error loading data from database:', error);
+                throw error;
+            }
+        }
+
+        // Load orders from database
+        async function loadOrdersFromDatabase() {
+            return new Promise((resolve, reject) => {
+                // Simulate API call delay
+                setTimeout(() => {
+                    try {
+                        // In a real application, this would be an AJAX call to get orders from database
+                        // For now, we'll use sample data structure that matches the database schema
+                        
+                        orders = [
+                            {
+                                id: 1,
+                                order_id: 'ORD-2024-001',
+                                user_id: 1,
+                                total_amount: 128.50,
+                                recipient_name: 'John Doe',
+                                recipient_phone: '+6012-345-6789',
+                                recipient_address: '123 Main St, Kuala Lumpur',
+                                delivery_date: '2024-01-20',
+                                delivery_time: '14:30 - 15:30',
+                                special_instructions: 'Please deliver to the main entrance',
+                                status: 'delivered',
+                                payment_method: 'Credit Card',
+                                payment_status: 'paid',
+                                created_at: '2024-01-19 10:25:30',
+                                updated_at: '2024-01-20 15:00:00',
+                                customer_name: 'John Doe',
+                                customer_email: 'john@example.com',
+                                customer_phone: '+6012-345-6789',
+                                customer_address: '123 Main St, Kuala Lumpur',
+                                items: [
+                                    { id: 1, menu_item_id: 1, quantity: 1, price: 45.00, name: 'Classic Cheesecake' },
+                                    { id: 2, menu_item_id: 3, quantity: 1, price: 58.50, name: 'Chocolate Truffle Cake' },
+                                    { id: 3, menu_item_id: 5, quantity: 1, price: 25.00, name: 'Strawberry Shortcake' }
+                                ]
+                            },
+                            {
+                                id: 2,
+                                order_id: 'ORD-2024-002',
+                                user_id: 2,
+                                total_amount: 85.00,
+                                recipient_name: 'Jane Smith',
+                                recipient_phone: '+6019-876-5432',
+                                recipient_address: '456 Oak Ave, Petaling Jaya',
+                                delivery_date: '2024-01-21',
+                                delivery_time: '10:00 - 11:00',
+                                special_instructions: '',
+                                status: 'processing',
+                                payment_method: 'Online Banking',
+                                payment_status: 'paid',
+                                created_at: '2024-01-20 09:15:45',
+                                updated_at: '2024-01-20 09:15:45',
+                                customer_name: 'Jane Smith',
+                                customer_email: 'jane@example.com',
+                                customer_phone: '+6019-876-5432',
+                                customer_address: '456 Oak Ave, Petaling Jaya',
+                                items: [
+                                    { id: 4, menu_item_id: 4, quantity: 2, price: 42.50, name: 'Matcha Green Tea Cake' }
+                                ]
+                            }
+                        ].map(order => ({
+                            ...order,
+                            total: order.total_amount
+                        }));
+                        
+                        console.log('Orders loaded:', orders.length);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 500);
+            });
+        }
+
+        // Load products from database
+        async function loadProductsFromDatabase() {
+            return new Promise((resolve, reject) => {
+                // Simulate API call delay
+                setTimeout(() => {
+                    try {
+                        // In a real application, this would be an AJAX call to get products from database
+                        products = [
+                            { id: 1, name: 'Classic Cheesecake', category_id: 1, price: 45.00, description: 'Creamy New York style cheesecake with a graham cracker crust', image_url: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.8, review_count: 156, is_available: true, category: 'Cheese Cake', stock: 20 },
+                            { id: 2, name: 'Strawberry Shortcake', category_id: 2, price: 25.00, description: 'Fresh strawberries layered with vanilla sponge cake and whipped cream', image_url: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.6, review_count: 98, is_available: true, category: 'Strawberry Cake', stock: 25 },
+                            { id: 3, name: 'Chocolate Truffle Cake', category_id: 3, price: 58.50, description: 'Rich chocolate cake with truffle ganache filling and chocolate shavings', image_url: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.9, review_count: 203, is_available: true, category: 'Chocolate Cake', stock: 15 },
+                            { id: 4, name: 'Matcha Green Tea Cake', category_id: 4, price: 42.50, description: 'Japanese matcha cake with red bean paste and green tea cream', image_url: 'https://images.unsplash.com/photo-1543363136-010fb91c6448?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.7, review_count: 87, is_available: true, category: 'Matcha Cake', stock: 18 },
+                            { id: 5, name: 'Coffee Cake', category_id: 5, price: 45.00, description: 'Moist coffee cake with walnuts and cinnamon streusel', image_url: 'https://images.unsplash.com/photo-1558326567-9883f6a32916?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.5, review_count: 112, is_available: true, category: 'Coffee Cake', stock: 22 },
+                            { id: 6, name: 'Vanilla Cake', category_id: 6, price: 40.00, description: 'Classic vanilla cake with buttercream frosting and sprinkles', image_url: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.4, review_count: 76, is_available: true, category: 'Vanilla Cake', stock: 30 }
+                        ];
+                        
+                        console.log('Products loaded:', products.length);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 300);
+            });
+        }
+
+        // Load users from database
+        async function loadUsersFromDatabase() {
+            return new Promise((resolve, reject) => {
+                // Simulate API call delay
+                setTimeout(() => {
+                    try {
+                        // In a real application, this would be an AJAX call to get users from database
+                        users = [
+                            { id: 1, username: 'user', password: 'user123', email: 'user@moricakes.com', full_name: 'Test User', phone: '+6012-345-6789', address: '123 Test St, Kuala Lumpur', role: 'user', created_at: '2024-01-01 00:00:00', updated_at: '2024-01-01 00:00:00' },
+                            { id: 2, username: 'john_doe', password: 'password123', email: 'john@example.com', full_name: 'John Doe', phone: '+6012-345-6789', address: '123 Main St, Kuala Lumpur', role: 'user', created_at: '2024-01-15 10:30:00', updated_at: '2024-01-15 10:30:00' },
+                            { id: 3, username: 'jane_smith', password: 'password123', email: 'jane@example.com', full_name: 'Jane Smith', phone: '+6019-876-5432', address: '456 Oak Ave, Petaling Jaya', role: 'user', created_at: '2024-01-18 14:20:00', updated_at: '2024-01-18 14:20:00' }
+                        ];
+                        
+                        console.log('Users loaded:', users.length);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 200);
+            });
+        }
+
+        // Load admins from database
+        async function loadAdminsFromDatabase() {
+            return new Promise((resolve, reject) => {
+                // Simulate API call delay
+                setTimeout(() => {
+                    try {
+                        // In a real application, this would be an AJAX call to get admins from database
+                        admins = [
+                            { id: 1, username: 'admin', password: 'admin123', email: 'admin@moricakes.com', full_name: 'Admin User', phone: '', address: '', role: 'admin', created_at: '2023-12-31 00:00:00', updated_at: '2023-12-31 00:00:00' },
+                            { id: 4, username: '242UT2449E', password: 'pw0001', email: 'admin1@moricakes.com', full_name: 'Yap Shi Tong', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' },
+                            { id: 5, username: '242UT2449F', password: 'pw0002', email: 'admin2@moricakes.com', full_name: 'Jamie Lim Shi Ting', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' },
+                            { id: 6, username: '243UT246XG', password: 'pw0003', email: 'admin3@moricakes.com', full_name: 'Ong Yong Quan', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' },
+                            { id: 7, username: '1201302385', password: 'pw0004', email: 'admin4@moricakes.com', full_name: 'Mohamed Abdelgabar Mohamed Awad', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' }
+                        ];
+                        
+                        console.log('Admins loaded:', admins.length);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 200);
+            });
+        }
+
+        // Load categories from database
+        async function loadCategoriesFromDatabase() {
+            return new Promise((resolve, reject) => {
+                // Simulate API call delay
+                setTimeout(() => {
+                    try {
+                        // In a real application, this would be an AJAX call to get categories from database
+                        categories = [
+                            { id: 1, name: 'cheese', description: 'Delicious cheesecakes', created_at: '2023-12-31 00:00:00' },
+                            { id: 2, name: 'strawberry', description: 'Fresh strawberry cakes', created_at: '2023-12-31 00:00:00' },
+                            { id: 3, name: 'chocolate', description: 'Rich chocolate cakes', created_at: '2023-12-31 00:00:00' },
+                            { id: 4, name: 'matcha', description: 'Japanese matcha cakes', created_at: '2023-12-31 00:00:00' },
+                            { id: 5, name: 'coffee', description: 'Coffee flavored cakes', created_at: '2023-12-31 00:00:00' },
+                            { id: 6, name: 'vanilla', description: 'Classic vanilla cakes', created_at: '2023-12-31 00:00:00' }
+                        ];
+                        
+                        console.log('Categories loaded:', categories.length);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 100);
+            });
+        }
 
         // Check if user is logged in as admin
         function checkAdminLogin() {
@@ -1275,7 +1472,7 @@ try {
 
         // Load admins
         function loadAdmins() {
-            const adminsHtml = admins.map((admin, index) => `
+            const adminsHtml = admins.map(admin => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${index + 1}</td>
                     <td class="py-3 px-4">${admin.full_name}</td>
