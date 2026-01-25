@@ -40,7 +40,7 @@ try {
                 case 'add_product':
                     $name = trim($_POST['name'] ?? '');
                     $categoryId = $_POST['category_id'] !== '' ? (int) $_POST['category_id'] : null;
-                    $price = (float) ($_POST['price'] ?? 0);
+                    $price = max(0, (float) ($_POST['price'] ?? 0));
                     $stock = max(0, (int) ($_POST['stock'] ?? 0));
                     $description = trim($_POST['description'] ?? '');
                     $imageUrl = trim($_POST['image_url'] ?? '');
@@ -73,7 +73,7 @@ try {
                     $productId = (int) ($_POST['product_id'] ?? 0);
                     $name = trim($_POST['name'] ?? '');
                     $categoryId = $_POST['category_id'] !== '' ? (int) $_POST['category_id'] : null;
-                    $price = (float) ($_POST['price'] ?? 0);
+                    $price = max(0, (float) ($_POST['price'] ?? 0));
                     $stock = max(0, (int) ($_POST['stock'] ?? 0));
                     $description = trim($_POST['description'] ?? '');
                     $imageUrl = trim($_POST['image_url'] ?? '');
@@ -725,6 +725,9 @@ if (!empty($_SESSION['flash'])) {
                             <i class="fa fa-plus mr-2"></i> Add Product
                         </button>
                     </div>
+                    <p class="text-sm text-red-600 mb-4">
+                        Don't random delete things, unless you know what you are doing. It's unrecoverable once deleted. (This action can't be undone.)
+                    </p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="products-grid">
                         <div class="text-center py-8 text-gray-500 col-span-full">
                             <i class="fa fa-spinner fa-spin text-primary text-2xl mb-4"></i>
@@ -744,6 +747,9 @@ if (!empty($_SESSION['flash'])) {
                             <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
                     </div>
+                    <p class="text-sm text-red-600 mb-4">
+                        Don't random delete things, unless you know what you are doing. It's unrecoverable once deleted. (This action can't be undone.)
+                    </p>
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
@@ -778,6 +784,9 @@ if (!empty($_SESSION['flash'])) {
                             <i class="fa fa-plus mr-2"></i> Add Admin
                         </button>
                     </div>
+                    <p class="text-sm text-red-600 mb-4">
+                        Don't random delete things, unless you know what you are doing. It's unrecoverable once deleted. (This action can't be undone.)
+                    </p>
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
@@ -807,17 +816,18 @@ if (!empty($_SESSION['flash'])) {
             <section id="settings-section" class="hidden space-y-6">
                 <div class="card p-6">
                     <h3 class="text-xl font-bold text-dark mb-6">System Settings</h3>
+                    <p class="text-sm text-gray-500 mb-6">Preview only. Settings are currently fixed.</p>
                     <div class="space-y-6">
                         <div>
                             <h4 class="font-medium text-dark mb-3">General Settings</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Site Name</label>
-                                    <input type="text" value="Mori Cakes" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <input type="text" value="Mori Cakes" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-                                    <select class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <select class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" disabled>
                                         <option value="RM">Malaysian Ringgit (RM)</option>
                                         <option value="USD">US Dollar ($)</option>
                                         <option value="EUR">Euro (€)</option>
@@ -830,18 +840,13 @@ if (!empty($_SESSION['flash'])) {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Fee</label>
-                                    <input type="number" value="12" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <input type="number" value="12" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Free Delivery Threshold</label>
-                                    <input type="number" value="100" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <input type="number" value="100" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
                                 </div>
                             </div>
-                        </div>
-                        <div class="pt-4">
-                            <button class="btn-primary">
-                                <i class="fa fa-save mr-2"></i> Save Settings
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -920,7 +925,7 @@ if (!empty($_SESSION['flash'])) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Price (RM)</label>
-                        <input type="number" id="product-price" name="price" step="0.01" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <input type="number" id="product-price" name="price" min="0" step="0.01" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Stock</label>
@@ -993,7 +998,7 @@ if (!empty($_SESSION['flash'])) {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Price (RM)</label>
-                            <input type="number" name="price" step="0.01" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingProduct['price']); ?>">
+                            <input type="number" name="price" min="0" step="0.01" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingProduct['price']); ?>">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Stock</label>
