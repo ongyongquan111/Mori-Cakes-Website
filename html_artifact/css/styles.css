@@ -1,0 +1,208 @@
+/* Tailwind CSS utilities */
+@layer utilities {
+  .text-shadow {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+  .btn-primary {
+    @apply bg-primary text-white px-4 py-2 rounded-full hover:bg-secondary transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50;
+  }
+  .btn-secondary {
+    @apply bg-white text-primary border border-primary px-4 py-2 rounded-full hover:bg-light transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  }
+  .input-primary {
+    @apply border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  }
+  .badge {
+    @apply absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center;
+  }
+  .drawer {
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  .drawer.open {
+    transform: translateX(0);
+  }
+  .countdown {
+    @apply font-mono text-lg font-bold text-primary;
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* Notification styles */
+.notification {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 400px;
+  animation: slideIn 0.3s ease-out;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.notification-success {
+  @apply bg-green-500 text-white;
+}
+
+.notification-error {
+  @apply bg-red-500 text-white;
+}
+
+.notification-warning {
+  @apply bg-yellow-500 text-white;
+}
+
+.notification-info {
+  @apply bg-blue-500 text-white;
+}
+
+/* Modal styles */
+.modal {
+  @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+}
+
+.modal-content {
+  @apply bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-auto transform transition-all duration-300;
+}
+
+.modal-header {
+  @apply flex justify-between items-center mb-6 pb-4 border-b;
+}
+
+.modal-title {
+  @apply text-2xl font-bold text-gray-800;
+}
+
+.modal-close {
+  @apply text-gray-500 hover:text-gray-700 transition-colors;
+}
+
+.modal-body {
+  @apply space-y-4;
+}
+
+.form-group {
+  @apply space-y-2;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700;
+}
+
+.form-input {
+  @apply w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200;
+}
+
+.form-button {
+  @apply w-full py-3 px-6 rounded-lg font-medium transition-all duration-200;
+}
+
+.form-link {
+  @apply text-primary hover:underline transition-colors;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  @apply flex items-center justify-center;
+}
+
+.loading-spinner::after {
+  content: '';
+  width: 24px;
+  height: 24px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #ff6b6b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Order history styles */
+.order-card {
+  @apply border rounded-lg mb-4 overflow-hidden transition-all duration-300 hover:shadow-md;
+}
+
+.order-header {
+  @apply bg-gray-50 p-4 border-b;
+}
+
+.order-items {
+  @apply p-4;
+}
+
+.order-item {
+  @apply flex justify-between items-center py-2 border-b last:border-b-0;
+}
+
+.order-total {
+  @apply flex justify-between items-center mt-4 pt-4 border-t font-bold;
+}
+
+.status-badge {
+  @apply px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.status-delivered {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-processing {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-cancelled {
+  @apply bg-gray-100 text-gray-800;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .notification {
+    min-width: 250px;
+    right: 10px;
+    left: 10px;
+  }
+  
+  .order-card {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    width: calc(100% + 2rem);
+  }
+}
