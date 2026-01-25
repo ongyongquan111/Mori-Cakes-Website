@@ -1,9 +1,8 @@
 // Mori Cakes - Main JavaScript File
-// Simplified version with essential features only
 
 // Global variables
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
-const deliveryThreshold = 100; // Free delivery threshold (RM)
+const deliveryThreshold = 0; // Free delivery threshold (RM)
 const deliveryFee = 12; // Delivery fee (RM)
 
 // DOM Elements
