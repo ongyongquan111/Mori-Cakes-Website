@@ -67,7 +67,7 @@ try {
     );
     $productsData = $productsStmt->fetchAll();
 
-    $usersStmt = $pdo->query("SELECT * FROM users ORDER BY created_at DESC");
+    $usersStmt = $pdo->query("SELECT * FROM users WHERE role = 'user' ORDER BY created_at DESC");
     $usersData = $usersStmt->fetchAll();
 
     $adminsStmt = $pdo->query("SELECT * FROM users WHERE role = 'admin' ORDER BY created_at DESC");
@@ -1400,7 +1400,9 @@ try {
 
         // Load users
         function loadUsers() {
-            const usersHtml = users.map(user => `
+            const usersHtml = users
+                .filter(user => user.role === 'user')
+                .map(user => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${user.id}</td>
                     <td class="py-3 px-4">${user.full_name}</td>
@@ -1429,10 +1431,11 @@ try {
         function filterUsers() {
             const searchTerm = document.getElementById('user-search').value.toLowerCase();
 
-            const filteredUsers = users.filter(user => 
-                user.full_name.toLowerCase().includes(searchTerm) ||
-                user.email.toLowerCase().includes(searchTerm) ||
-                user.username.toLowerCase().includes(searchTerm)
+            const filteredUsers = users.filter(user =>
+                user.role === 'user' &&
+                (user.full_name.toLowerCase().includes(searchTerm) ||
+                    user.email.toLowerCase().includes(searchTerm) ||
+                    user.username.toLowerCase().includes(searchTerm))
             );
 
             const usersHtml = filteredUsers.map(user => `
@@ -1472,7 +1475,9 @@ try {
 
         // Load admins
         function loadAdmins() {
-            const adminsHtml = admins.map(admin => `
+            const adminsHtml = admins
+                .filter(admin => admin.role === 'admin')
+                .map((admin, index) => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${index + 1}</td>
                     <td class="py-3 px-4">${admin.full_name}</td>
