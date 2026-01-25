@@ -1,5 +1,5 @@
 <?php
-// Mori Cakes - Complete Version
+// Mori Cakes PHP Website
 session_start();
 
 // Database configuration
@@ -26,7 +26,7 @@ if (function_exists('getMenuItems')) {
     $allMenuItems = getMenuItems();
 }
 
-// Handle API requests
+// Handle requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
@@ -178,7 +178,7 @@ function handleRegister($postData) {
         return ['success' => false, 'message' => 'Email already exists'];
     }
     
-    // Create new user (plaintext password for university project)
+    // Create new user
     $sql = "INSERT INTO users (username, password, email, full_name) VALUES (?, ?, ?, ?)";
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([$username, $password, $email, $name]);
