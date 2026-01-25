@@ -6,6 +6,14 @@ $dbname = 'mori_cakes';
 $username = 'root';
 $password = '';
 
+$isAdminSession = false;
+if (isset($_GET['admin']) && $_GET['admin'] === 'true') {
+    $_SESSION['is_admin'] = true;
+}
+if (!empty($_SESSION['is_admin'])) {
+    $isAdminSession = true;
+}
+
 $pdo = null;
 $ordersData = [];
 $productsData = [];
@@ -1437,10 +1445,7 @@ if (!empty($_SESSION['flash'])) {
 
         // Check if user is logged in as admin
         function checkAdminLogin() {
-            // In a real application, this would check a session or token
-            // For this demo, we'll just check if the user came from the login page with admin credentials
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('admin') === 'true';
+            return <?php echo $isAdminSession ? 'true' : 'false'; ?>;
         }
 
         // Show specific section
