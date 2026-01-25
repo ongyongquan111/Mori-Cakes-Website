@@ -6,17 +6,251 @@ $dbname = 'mori_cakes';
 $username = 'root';
 $password = '';
 
+$isAdminSession = false;
+if (isset($_GET['admin']) && $_GET['admin'] === 'true') {
+    $_SESSION['is_admin'] = true;
+}
+if (!empty($_SESSION['is_admin'])) {
+    $isAdminSession = true;
+}
+
 $pdo = null;
 $ordersData = [];
 $productsData = [];
 $usersData = [];
 $adminsData = [];
 $categoriesData = [];
+$flashMessage = null;
+$flashType = 'success';
+$editingProduct = null;
+$editingUser = null;
+$editingAdmin = null;
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $action = $_POST['action'] ?? '';
+        $section = $_POST['section'] ?? 'dashboard';
+
+        try {
+            switch ($action) {
+                case 'add_product':
+                    $name = trim($_POST['name'] ?? '');
+                    $categoryId = $_POST['category_id'] !== '' ? (int) $_POST['category_id'] : null;
+                    $price = max(0, (float) ($_POST['price'] ?? 0));
+                    $stock = max(0, (int) ($_POST['stock'] ?? 0));
+                    $description = trim($_POST['description'] ?? '');
+                    $imageUrl = trim($_POST['image_url'] ?? '');
+                    $isAvailable = isset($_POST['is_available']) ? 1 : 0;
+                    $ratingInput = trim($_POST['rating'] ?? '');
+                    $rating = $ratingInput === '' ? null : max(0, min(5, (float) $ratingInput));
+                    $reviewCount = max(0, (int) ($_POST['review_count'] ?? 0));
+
+                    $stmt = $pdo->prepare(
+                        "INSERT INTO menu_items (name, category_id, price, description, image_url, rating, review_count, stock, is_available)
+                         VALUES (:name, :category_id, :price, :description, :image_url, :rating, :review_count, :stock, :is_available)"
+                    );
+                    $stmt->execute([
+                        ':name' => $name,
+                        ':category_id' => $categoryId,
+                        ':price' => $price,
+                        ':description' => $description,
+                        ':image_url' => $imageUrl,
+                        ':rating' => $rating,
+                        ':review_count' => $reviewCount,
+                        ':stock' => $stock,
+                        ':is_available' => $isAvailable
+                    ]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Product added successfully.'];
+                    header("Location: admin.php?section=products");
+                    exit;
+
+                case 'update_product':
+                    $productId = (int) ($_POST['product_id'] ?? 0);
+                    $name = trim($_POST['name'] ?? '');
+                    $categoryId = $_POST['category_id'] !== '' ? (int) $_POST['category_id'] : null;
+                    $price = max(0, (float) ($_POST['price'] ?? 0));
+                    $stock = max(0, (int) ($_POST['stock'] ?? 0));
+                    $description = trim($_POST['description'] ?? '');
+                    $imageUrl = trim($_POST['image_url'] ?? '');
+                    $isAvailable = isset($_POST['is_available']) ? 1 : 0;
+                    $ratingInput = trim($_POST['rating'] ?? '');
+                    $rating = $ratingInput === '' ? null : max(0, min(5, (float) $ratingInput));
+                    $reviewCount = max(0, (int) ($_POST['review_count'] ?? 0));
+
+                    $stmt = $pdo->prepare(
+                        "UPDATE menu_items
+                         SET name = :name,
+                             category_id = :category_id,
+                             price = :price,
+                             description = :description,
+                             image_url = :image_url,
+                             rating = :rating,
+                             review_count = :review_count,
+                             stock = :stock,
+                             is_available = :is_available
+                         WHERE id = :id"
+                    );
+                    $stmt->execute([
+                        ':name' => $name,
+                        ':category_id' => $categoryId,
+                        ':price' => $price,
+                        ':description' => $description,
+                        ':image_url' => $imageUrl,
+                        ':rating' => $rating,
+                        ':review_count' => $reviewCount,
+                        ':stock' => $stock,
+                        ':is_available' => $isAvailable,
+                        ':id' => $productId
+                    ]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Product updated successfully.'];
+                    header("Location: admin.php?section=products");
+                    exit;
+
+                case 'delete_product':
+                    $productId = (int) ($_POST['product_id'] ?? 0);
+                    $stmt = $pdo->prepare("DELETE FROM menu_items WHERE id = :id");
+                    $stmt->execute([':id' => $productId]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Product deleted successfully.'];
+                    header("Location: admin.php?section=products");
+                    exit;
+
+                case 'add_admin':
+                    $fullName = trim($_POST['full_name'] ?? '');
+                    $email = trim($_POST['email'] ?? '');
+                    $usernameInput = trim($_POST['username'] ?? '');
+                    $passwordInput = trim($_POST['password'] ?? '');
+
+                    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = :email OR username = :username");
+                    $checkStmt->execute([':email' => $email, ':username' => $usernameInput]);
+                    if ((int) $checkStmt->fetchColumn() > 0) {
+                        $_SESSION['flash'] = ['type' => 'error', 'message' => 'Admin with this email or username already exists.'];
+                        header("Location: admin.php?section=admins");
+                        exit;
+                    }
+
+                    $stmt = $pdo->prepare(
+                        "INSERT INTO users (username, password, email, full_name, role)
+                         VALUES (:username, :password, :email, :full_name, 'admin')"
+                    );
+                    $stmt->execute([
+                        ':username' => $usernameInput,
+                        ':password' => $passwordInput,
+                        ':email' => $email,
+                        ':full_name' => $fullName
+                    ]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Admin account added successfully.'];
+                    header("Location: admin.php?section=admins");
+                    exit;
+
+                case 'update_user':
+                    $userId = (int) ($_POST['user_id'] ?? 0);
+                    $fullName = trim($_POST['full_name'] ?? '');
+                    $email = trim($_POST['email'] ?? '');
+                    $usernameInput = trim($_POST['username'] ?? '');
+                    $phone = trim($_POST['phone'] ?? '');
+                    $address = trim($_POST['address'] ?? '');
+                    $role = $_POST['role'] ?? 'user';
+
+                    $stmt = $pdo->prepare(
+                        "UPDATE users
+                         SET full_name = :full_name,
+                             email = :email,
+                             username = :username,
+                             phone = :phone,
+                             address = :address,
+                             role = :role
+                         WHERE id = :id"
+                    );
+                    $stmt->execute([
+                        ':full_name' => $fullName,
+                        ':email' => $email,
+                        ':username' => $usernameInput,
+                        ':phone' => $phone,
+                        ':address' => $address,
+                        ':role' => $role,
+                        ':id' => $userId
+                    ]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'User updated successfully.'];
+                    header("Location: admin.php?section=users");
+                    exit;
+
+                case 'update_admin':
+                    $adminId = (int) ($_POST['user_id'] ?? 0);
+                    $fullName = trim($_POST['full_name'] ?? '');
+                    $email = trim($_POST['email'] ?? '');
+                    $usernameInput = trim($_POST['username'] ?? '');
+                    $phone = trim($_POST['phone'] ?? '');
+                    $address = trim($_POST['address'] ?? '');
+
+                    $stmt = $pdo->prepare(
+                        "UPDATE users
+                         SET full_name = :full_name,
+                             email = :email,
+                             username = :username,
+                             phone = :phone,
+                             address = :address,
+                             role = 'admin'
+                         WHERE id = :id"
+                    );
+                    $stmt->execute([
+                        ':full_name' => $fullName,
+                        ':email' => $email,
+                        ':username' => $usernameInput,
+                        ':phone' => $phone,
+                        ':address' => $address,
+                        ':id' => $adminId
+                    ]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Admin account updated successfully.'];
+                    header("Location: admin.php?section=admins");
+                    exit;
+
+                case 'delete_user':
+                    $userId = (int) ($_POST['user_id'] ?? 0);
+                    $stmt = $pdo->prepare("DELETE FROM users WHERE id = :id");
+                    $stmt->execute([':id' => $userId]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'User deleted successfully.'];
+                    header("Location: admin.php?section=users");
+                    exit;
+
+                case 'delete_admin':
+                    $adminId = (int) ($_POST['user_id'] ?? 0);
+                    $countStmt = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'");
+                    if ((int) $countStmt->fetchColumn() <= 1) {
+                        $_SESSION['flash'] = ['type' => 'error', 'message' => 'Cannot delete the last admin account.'];
+                        header("Location: admin.php?section=admins");
+                        exit;
+                    }
+
+                    $stmt = $pdo->prepare("DELETE FROM users WHERE id = :id AND role = 'admin'");
+                    $stmt->execute([':id' => $adminId]);
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Admin account deleted successfully.'];
+                    header("Location: admin.php?section=admins");
+                    exit;
+
+                default:
+                    $_SESSION['flash'] = ['type' => 'error', 'message' => 'Unknown action requested.'];
+                    header("Location: admin.php?section=" . urlencode($section));
+                    exit;
+            }
+        } catch (PDOException $e) {
+            error_log("Admin action error: " . $e->getMessage());
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Unable to complete the requested action.'];
+            header("Location: admin.php?section=" . urlencode($section));
+            exit;
+        }
+    }
 
     $ordersStmt = $pdo->query(
         "SELECT o.*, 
@@ -75,8 +309,44 @@ try {
 
     $categoriesStmt = $pdo->query("SELECT * FROM categories ORDER BY id ASC");
     $categoriesData = $categoriesStmt->fetchAll();
+
+    if (!empty($_GET['edit_product_id'])) {
+        $editId = (int) $_GET['edit_product_id'];
+        foreach ($productsData as $product) {
+            if ((int) $product['id'] === $editId) {
+                $editingProduct = $product;
+                break;
+            }
+        }
+    }
+
+    if (!empty($_GET['edit_user_id'])) {
+        $editId = (int) $_GET['edit_user_id'];
+        foreach ($usersData as $user) {
+            if ((int) $user['id'] === $editId) {
+                $editingUser = $user;
+                break;
+            }
+        }
+    }
+
+    if (!empty($_GET['edit_admin_id'])) {
+        $editId = (int) $_GET['edit_admin_id'];
+        foreach ($adminsData as $admin) {
+            if ((int) $admin['id'] === $editId) {
+                $editingAdmin = $admin;
+                break;
+            }
+        }
+    }
 } catch (PDOException $e) {
     error_log("Database connection error: " . $e->getMessage());
+}
+
+if (!empty($_SESSION['flash'])) {
+    $flashMessage = $_SESSION['flash']['message'] ?? null;
+    $flashType = $_SESSION['flash']['type'] ?? 'success';
+    unset($_SESSION['flash']);
 }
 ?>
 <!DOCTYPE html>
@@ -292,6 +562,13 @@ try {
 
         <!-- Main content -->
         <main class="flex-1 p-6 md:p-8">
+            <?php if ($flashMessage): ?>
+                <div class="mb-6">
+                    <div class="rounded-lg border px-4 py-3 text-sm <?php echo $flashType === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'; ?>">
+                        <?php echo htmlspecialchars($flashMessage); ?>
+                    </div>
+                </div>
+            <?php endif; ?>
             <header class="mb-8">
                 <h1 class="text-3xl font-bold text-dark">Admin Dashboard</h1>
                 <p class="text-gray-600">Welcome to Mori Cakes Admin Panel</p>
@@ -448,6 +725,9 @@ try {
                             <i class="fa fa-plus mr-2"></i> Add Product
                         </button>
                     </div>
+                    <p class="text-sm text-red-600 mb-4">
+                        Don't random delete things, unless you know what you are doing. It's unrecoverable once deleted. (This action can't be undone.)
+                    </p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="products-grid">
                         <div class="text-center py-8 text-gray-500 col-span-full">
                             <i class="fa fa-spinner fa-spin text-primary text-2xl mb-4"></i>
@@ -467,6 +747,9 @@ try {
                             <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
                     </div>
+                    <p class="text-sm text-red-600 mb-4">
+                        Don't random delete things, unless you know what you are doing. It's unrecoverable once deleted. (This action can't be undone.)
+                    </p>
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
@@ -501,6 +784,9 @@ try {
                             <i class="fa fa-plus mr-2"></i> Add Admin
                         </button>
                     </div>
+                    <p class="text-sm text-red-600 mb-4">
+                        Don't random delete things, unless you know what you are doing. It's unrecoverable once deleted. (This action can't be undone.)
+                    </p>
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
@@ -530,17 +816,18 @@ try {
             <section id="settings-section" class="hidden space-y-6">
                 <div class="card p-6">
                     <h3 class="text-xl font-bold text-dark mb-6">System Settings</h3>
+                    <p class="text-sm text-gray-500 mb-6">Preview only. Settings are currently fixed.</p>
                     <div class="space-y-6">
                         <div>
                             <h4 class="font-medium text-dark mb-3">General Settings</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Site Name</label>
-                                    <input type="text" value="Mori Cakes" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <input type="text" value="Mori Cakes" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-                                    <select class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <select class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" disabled>
                                         <option value="RM">Malaysian Ringgit (RM)</option>
                                         <option value="USD">US Dollar ($)</option>
                                         <option value="EUR">Euro (€)</option>
@@ -553,18 +840,13 @@ try {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Fee</label>
-                                    <input type="number" value="12" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <input type="number" value="12" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Free Delivery Threshold</label>
-                                    <input type="number" value="100" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <input type="number" value="100" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
                                 </div>
                             </div>
-                        </div>
-                        <div class="pt-4">
-                            <button class="btn-primary">
-                                <i class="fa fa-save mr-2"></i> Save Settings
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -582,22 +864,24 @@ try {
                     <i class="fa fa-times text-xl"></i>
                 </button>
             </div>
-            <form id="add-admin-form" class="space-y-4">
+            <form id="add-admin-form" class="space-y-4" method="post" action="admin.php">
+                <input type="hidden" name="action" value="add_admin">
+                <input type="hidden" name="section" value="admins">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                    <input type="text" id="admin-fullname" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input type="text" id="admin-fullname" name="full_name" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input type="email" id="admin-email" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input type="email" id="admin-email" name="email" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                    <input type="text" id="admin-username" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input type="text" id="admin-username" name="username" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                    <input type="password" id="admin-password" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input type="password" id="admin-password" name="password" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
                 <div class="pt-4">
                     <button type="submit" class="btn-primary w-full">
@@ -618,42 +902,57 @@ try {
                     <i class="fa fa-times text-xl"></i>
                 </button>
             </div>
-            <form id="add-product-form" class="space-y-4">
+            <form id="add-product-form" class="space-y-4" method="post" action="admin.php">
+                <input type="hidden" name="action" value="add_product">
+                <input type="hidden" name="section" value="products">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
-                        <input type="text" id="product-name" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <input type="text" id="product-name" name="name" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                        <select id="product-category" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <select id="product-category" name="category_id" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                             <option value="">Select Category</option>
-                            <option value="Cheese Cake">Cheese Cake</option>
-                            <option value="Strawberry Cake">Strawberry Cake</option>
-                            <option value="Chocolate Cake">Chocolate Cake</option>
-                            <option value="Matcha Cake">Matcha Cake</option>
-                            <option value="Coffee Cake">Coffee Cake</option>
-                            <option value="Vanilla Cake">Vanilla Cake</option>
+                            <?php foreach ($categoriesData as $category): ?>
+                                <option value="<?php echo (int) $category['id']; ?>">
+                                    <?php echo htmlspecialchars($category['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Price (RM)</label>
-                        <input type="number" id="product-price" step="0.1" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <input type="number" id="product-price" name="price" min="0" step="0.01" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Stock</label>
-                        <input type="number" id="product-stock" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <input type="number" id="product-stock" name="stock" min="0" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Rating (0-5)</label>
+                        <input type="number" id="product-rating" name="rating" min="0" max="5" step="0.1" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 4.5">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Review Count</label>
+                        <input type="number" id="product-review-count" name="review_count" min="0" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 120">
                     </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                    <textarea id="product-description" rows="3" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                    <textarea id="product-description" name="description" rows="3" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
-                    <input type="url" id="product-image" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input type="url" id="product-image" name="image_url" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="product-available" name="is_available" class="mr-2" checked>
+                    <label for="product-available" class="text-sm text-gray-700">Available for ordering</label>
                 </div>
                 <div class="pt-4">
                     <button type="submit" class="btn-primary">
@@ -661,6 +960,185 @@ try {
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Edit Product Modal -->
+    <div id="edit-product-modal" class="fixed inset-0 flex items-center justify-center z-50 <?php echo $editingProduct ? '' : 'hidden'; ?>">
+        <div class="absolute inset-0 bg-black bg-opacity-50" onclick="window.location.href='admin.php?section=products'"></div>
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full relative z-10">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-dark">Edit Product</h3>
+                <a class="text-gray-500 hover:text-gray-700" href="admin.php?section=products">
+                    <i class="fa fa-times text-xl"></i>
+                </a>
+            </div>
+            <?php if ($editingProduct): ?>
+                <form class="space-y-4" method="post" action="admin.php">
+                    <input type="hidden" name="action" value="update_product">
+                    <input type="hidden" name="section" value="products">
+                    <input type="hidden" name="product_id" value="<?php echo (int) $editingProduct['id']; ?>">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
+                            <input type="text" name="name" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingProduct['name']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                            <select name="category_id" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="">Select Category</option>
+                                <?php foreach ($categoriesData as $category): ?>
+                                    <option value="<?php echo (int) $category['id']; ?>" <?php echo ((int) $editingProduct['category_id'] === (int) $category['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($category['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Price (RM)</label>
+                            <input type="number" name="price" min="0" step="0.01" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingProduct['price']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Stock</label>
+                            <input type="number" name="stock" min="0" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars((string) $editingProduct['stock']); ?>">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Rating (0-5)</label>
+                            <input type="number" name="rating" min="0" max="5" step="0.1" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars((string) $editingProduct['rating']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Review Count</label>
+                            <input type="number" name="review_count" min="0" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars((string) $editingProduct['review_count']); ?>">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea name="description" rows="3" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"><?php echo htmlspecialchars($editingProduct['description']); ?></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+                        <input type="url" name="image_url" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingProduct['image_url']); ?>">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="edit-product-available" name="is_available" class="mr-2" <?php echo !empty($editingProduct['is_available']) ? 'checked' : ''; ?>>
+                        <label for="edit-product-available" class="text-sm text-gray-700">Available for ordering</label>
+                    </div>
+                    <div class="pt-4">
+                        <button type="submit" class="btn-primary">
+                            <i class="fa fa-save mr-2"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            <?php else: ?>
+                <p class="text-sm text-gray-500">Product not found.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="edit-user-modal" class="fixed inset-0 flex items-center justify-center z-50 <?php echo $editingUser ? '' : 'hidden'; ?>">
+        <div class="absolute inset-0 bg-black bg-opacity-50" onclick="window.location.href='admin.php?section=users'"></div>
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full relative z-10">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-dark">Edit User</h3>
+                <a class="text-gray-500 hover:text-gray-700" href="admin.php?section=users">
+                    <i class="fa fa-times text-xl"></i>
+                </a>
+            </div>
+            <?php if ($editingUser): ?>
+                <form class="space-y-4" method="post" action="admin.php">
+                    <input type="hidden" name="action" value="update_user">
+                    <input type="hidden" name="section" value="users">
+                    <input type="hidden" name="user_id" value="<?php echo (int) $editingUser['id']; ?>">
+                    <input type="hidden" name="role" value="user">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                            <input type="text" name="full_name" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingUser['full_name']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <input type="email" name="email" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingUser['email']); ?>">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                            <input type="text" name="username" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingUser['username']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                            <input type="text" name="phone" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingUser['phone'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                        <textarea name="address" rows="3" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"><?php echo htmlspecialchars($editingUser['address'] ?? ''); ?></textarea>
+                    </div>
+                    <div class="pt-4">
+                        <button type="submit" class="btn-primary">
+                            <i class="fa fa-save mr-2"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            <?php else: ?>
+                <p class="text-sm text-gray-500">User not found.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Edit Admin Modal -->
+    <div id="edit-admin-modal" class="fixed inset-0 flex items-center justify-center z-50 <?php echo $editingAdmin ? '' : 'hidden'; ?>">
+        <div class="absolute inset-0 bg-black bg-opacity-50" onclick="window.location.href='admin.php?section=admins'"></div>
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full relative z-10">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-dark">Edit Admin</h3>
+                <a class="text-gray-500 hover:text-gray-700" href="admin.php?section=admins">
+                    <i class="fa fa-times text-xl"></i>
+                </a>
+            </div>
+            <?php if ($editingAdmin): ?>
+                <form class="space-y-4" method="post" action="admin.php">
+                    <input type="hidden" name="action" value="update_admin">
+                    <input type="hidden" name="section" value="admins">
+                    <input type="hidden" name="user_id" value="<?php echo (int) $editingAdmin['id']; ?>">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                            <input type="text" name="full_name" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingAdmin['full_name']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <input type="email" name="email" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingAdmin['email']); ?>">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                            <input type="text" name="username" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingAdmin['username']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                            <input type="text" name="phone" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars($editingAdmin['phone'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                        <textarea name="address" rows="3" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"><?php echo htmlspecialchars($editingAdmin['address'] ?? ''); ?></textarea>
+                    </div>
+                    <div class="pt-4">
+                        <button type="submit" class="btn-primary">
+                            <i class="fa fa-save mr-2"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            <?php else: ?>
+                <p class="text-sm text-gray-500">Admin account not found.</p>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -720,6 +1198,14 @@ try {
             
             // Setup event listeners
             setupEventListeners();
+
+            const sectionParam = new URLSearchParams(window.location.search).get('section');
+            if (sectionParam) {
+                const targetSectionId = `${sectionParam}-section`;
+                if (document.getElementById(targetSectionId)) {
+                    showSection(targetSectionId);
+                }
+            }
         });
 
         // Initialize dashboard with loading states
@@ -996,10 +1482,7 @@ try {
 
         // Check if user is logged in as admin
         function checkAdminLogin() {
-            // In a real application, this would check a session or token
-            // For this demo, we'll just check if the user came from the login page with admin credentials
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('admin') === 'true';
+            return <?php echo $isAdminSession ? 'true' : 'false'; ?>;
         }
 
         // Show specific section
@@ -1034,24 +1517,6 @@ try {
 
             if (elements.closeMobileMenu) {
                 elements.closeMobileMenu.addEventListener('click', closeMobileMenu);
-            }
-
-            // Add admin form submission
-            const addAdminForm = document.getElementById('add-admin-form');
-            if (addAdminForm) {
-                addAdminForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    addAdminAccount();
-                });
-            }
-
-            // Add product form submission
-            const addProductForm = document.getElementById('add-product-form');
-            if (addProductForm) {
-                addProductForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    addProduct();
-                });
             }
 
             // Search and filter
@@ -1329,36 +1794,29 @@ try {
                     <img src="${product.image_url}" alt="${product.name}" class="w-full h-48 object-cover">
                     <div class="p-4">
                         <h4 class="font-bold text-dark mb-2">${product.name}</h4>
-                        <p class="text-sm text-gray-600 mb-2">${product.category}</p>
+                        <p class="text-sm text-gray-600 mb-2">${product.category || 'Uncategorized'}</p>
                         <div class="flex justify-between items-center mb-4">
                             <span class="font-bold text-primary">RM${Number(product.price || 0).toFixed(2)}</span>
                             <span class="text-sm text-gray-500">Stock: ${product.stock ?? 0}</span>
                         </div>
                         <div class="flex space-x-2">
-                            <button class="btn-primary text-sm flex-1" onclick="editProduct(${product.id})">
+                            <a class="btn-primary text-sm flex-1 text-center" href="admin.php?section=products&edit_product_id=${product.id}">
                                 <i class="fa fa-edit mr-1"></i> Edit
-                            </button>
-                            <button class="btn-danger text-sm" onclick="deleteProduct(${product.id})">
-                                <i class="fa fa-trash mr-1"></i> Delete
-                            </button>
+                            </a>
+                            <form method="post" action="admin.php">
+                                <input type="hidden" name="action" value="delete_product">
+                                <input type="hidden" name="section" value="products">
+                                <input type="hidden" name="product_id" value="${product.id}">
+                                <button type="submit" class="btn-danger text-sm">
+                                    <i class="fa fa-trash mr-1"></i> Delete
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
             `).join('');
 
             document.getElementById('products-grid').innerHTML = productsHtml;
-        }
-
-        // Edit product
-        function editProduct(productId) {
-            alert(`Edit product ${productId}. This would open an edit form in a real application.`);
-        }
-
-        // Delete product
-        function deleteProduct(productId) {
-            if (confirm('Are you sure you want to delete this product?')) {
-                alert(`Product ${productId} deleted. This would remove the product from the database in a real application.`);
-            }
         }
 
         // Open add product modal
@@ -1372,31 +1830,7 @@ try {
             document.getElementById('add-product-form').reset();
         }
 
-        // Add product
-        function addProduct() {
-            const name = document.getElementById('product-name').value;
-            const category = document.getElementById('product-category').value;
-            const price = parseFloat(document.getElementById('product-price').value);
-            const stock = parseInt(document.getElementById('product-stock').value);
-            const description = document.getElementById('product-description').value;
-            const image = document.getElementById('product-image').value;
-
-            const newProduct = {
-                id: products.length + 1,
-                name,
-                category,
-                price,
-                stock,
-                image_url: image,
-                description
-            };
-
-            products.push(newProduct);
-            alert('Product added successfully!');
-            closeAddProductModal();
-            loadProducts();
-            loadDashboardStats();
-        }
+        // Add product handled by form submission
 
         // Load users
         function loadUsers() {
@@ -1414,12 +1848,17 @@ try {
                     </td>
                     <td class="py-3 px-4">${user.created_at}</td>
                     <td class="py-3 px-4">
-                        <button class="btn-secondary text-sm" onclick="viewUserDetail(${user.id})">
-                            <i class="fa fa-eye mr-1"></i> View
-                        </button>
-                        <button class="btn-primary text-sm ml-2" onclick="editUser(${user.id})">
+                        <a class="btn-primary text-sm" href="admin.php?section=users&edit_user_id=${user.id}">
                             <i class="fa fa-edit mr-1"></i> Edit
-                        </button>
+                        </a>
+                        <form method="post" action="admin.php" class="inline-block ml-2">
+                            <input type="hidden" name="action" value="delete_user">
+                            <input type="hidden" name="section" value="users">
+                            <input type="hidden" name="user_id" value="${user.id}">
+                            <button type="submit" class="btn-danger text-sm">
+                                <i class="fa fa-trash mr-1"></i> Delete
+                            </button>
+                        </form>
                     </td>
                 </tr>
             `).join('');
@@ -1450,12 +1889,17 @@ try {
                     </td>
                     <td class="py-3 px-4">${user.created_at}</td>
                     <td class="py-3 px-4">
-                        <button class="btn-secondary text-sm" onclick="viewUserDetail(${user.id})">
-                            <i class="fa fa-eye mr-1"></i> View
-                        </button>
-                        <button class="btn-primary text-sm ml-2" onclick="editUser(${user.id})">
+                        <a class="btn-primary text-sm" href="admin.php?section=users&edit_user_id=${user.id}">
                             <i class="fa fa-edit mr-1"></i> Edit
-                        </button>
+                        </a>
+                        <form method="post" action="admin.php" class="inline-block ml-2">
+                            <input type="hidden" name="action" value="delete_user">
+                            <input type="hidden" name="section" value="users">
+                            <input type="hidden" name="user_id" value="${user.id}">
+                            <button type="submit" class="btn-danger text-sm">
+                                <i class="fa fa-trash mr-1"></i> Delete
+                            </button>
+                        </form>
                     </td>
                 </tr>
             `).join('');
@@ -1463,15 +1907,7 @@ try {
             document.getElementById('all-users').innerHTML = usersHtml;
         }
 
-        // View user detail
-        function viewUserDetail(userId) {
-            alert(`View user ${userId}. This would show detailed user information in a real application.`);
-        }
-
-        // Edit user
-        function editUser(userId) {
-            alert(`Edit user ${userId}. This would open an edit form in a real application.`);
-        }
+        // User management handled by forms
 
         // Load admins
         function loadAdmins() {
@@ -1485,12 +1921,17 @@ try {
                     <td class="py-3 px-4">${admin.username}</td>
                     <td class="py-3 px-4">${admin.created_at}</td>
                     <td class="py-3 px-4">
-                        <button class="btn-primary text-sm" onclick="editAdmin(${admin.id})">
+                        <a class="btn-primary text-sm" href="admin.php?section=admins&edit_admin_id=${admin.id}">
                             <i class="fa fa-edit mr-1"></i> Edit
-                        </button>
-                        <button class="btn-danger text-sm ml-2" onclick="deleteAdmin(${admin.id})">
-                            <i class="fa fa-trash mr-1"></i> Delete
-                        </button>
+                        </a>
+                        <form method="post" action="admin.php" class="inline-block ml-2">
+                            <input type="hidden" name="action" value="delete_admin">
+                            <input type="hidden" name="section" value="admins">
+                            <input type="hidden" name="user_id" value="${admin.id}">
+                            <button type="submit" class="btn-danger text-sm">
+                                <i class="fa fa-trash mr-1"></i> Delete
+                            </button>
+                        </form>
                     </td>
                 </tr>
             `).join('');
@@ -1509,69 +1950,7 @@ try {
             document.getElementById('add-admin-form').reset();
         }
 
-        // Add admin account
-        function addAdminAccount() {
-            const fullName = document.getElementById('admin-fullname').value;
-            const email = document.getElementById('admin-email').value;
-            const username = document.getElementById('admin-username').value;
-            const password = document.getElementById('admin-password').value;
-
-            // Check if admin already exists
-            if (admins.some(admin => admin.email === email || admin.username === username)) {
-                alert('Admin with this email or username already exists!');
-                return;
-            }
-
-            const newAdmin = {
-                id: admins.length + 1,
-                full_name: fullName,
-                email: email,
-                username: username,
-                // In a real application, password would be hashed
-                password: password,
-                created_at: new Date().toISOString().split('T')[0]
-            };
-
-            admins.push(newAdmin);
-            users.push({
-                id: users.length + 1,
-                full_name: fullName,
-                email: email,
-                username: username,
-                role: 'admin',
-                created_at: newAdmin.created_at
-            });
-
-            alert('Admin account added successfully!');
-            closeAddAdminModal();
-            loadAdmins();
-        }
-
-        // Edit admin
-        function editAdmin(adminId) {
-            alert(`Edit admin ${adminId}. This would open an edit form in a real application.`);
-        }
-
-        // Delete admin
-        function deleteAdmin(adminId) {
-            if (admins.length <= 1) {
-                alert('Cannot delete the last admin account!');
-                return;
-            }
-
-            if (confirm('Are you sure you want to delete this admin account?')) {
-                const admin = admins.find(a => a.id === adminId);
-                if (admin) {
-                    // Remove from admins array
-                    admins = admins.filter(a => a.id !== adminId);
-                    // Remove from users array
-                    users = users.filter(u => !(u.email === admin.email && u.role === 'admin'));
-                    
-                    alert('Admin account deleted successfully!');
-                    loadAdmins();
-                }
-            }
-        }
+        // Admin management handled by forms
 
         // Helper functions
         function formatDate(dateString) {
