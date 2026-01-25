@@ -1,5 +1,4 @@
 -- MySQL Database Schema for Mori Cakes Online Ordering System
--- This schema is designed for AWS RDS MySQL
 
 -- Create database (if not exists)
 CREATE DATABASE IF NOT EXISTS mori_cakes;
@@ -97,7 +96,7 @@ INSERT INTO categories (name, description) VALUES
 ('coffee', 'Coffee flavored cakes'),
 ('vanilla', 'Classic vanilla cakes');
 
--- Default admin users (for university project - plain text passwords)
+-- Default admin users
 INSERT INTO users (username, password, email, full_name, role) VALUES
 ('user', 'user123', 'user@moricakes.com', 'Test User', 'user'),
 ('admin', 'admin123', 'admin@moricakes.com', 'Test Admin', 'admin'),
