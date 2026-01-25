@@ -41,14 +41,17 @@ try {
                     $name = trim($_POST['name'] ?? '');
                     $categoryId = $_POST['category_id'] !== '' ? (int) $_POST['category_id'] : null;
                     $price = (float) ($_POST['price'] ?? 0);
-                    $stock = (int) ($_POST['stock'] ?? 0);
+                    $stock = max(0, (int) ($_POST['stock'] ?? 0));
                     $description = trim($_POST['description'] ?? '');
                     $imageUrl = trim($_POST['image_url'] ?? '');
                     $isAvailable = isset($_POST['is_available']) ? 1 : 0;
+                    $ratingInput = trim($_POST['rating'] ?? '');
+                    $rating = $ratingInput === '' ? null : max(0, min(5, (float) $ratingInput));
+                    $reviewCount = max(0, (int) ($_POST['review_count'] ?? 0));
 
                     $stmt = $pdo->prepare(
-                        "INSERT INTO menu_items (name, category_id, price, description, image_url, stock, is_available)
-                         VALUES (:name, :category_id, :price, :description, :image_url, :stock, :is_available)"
+                        "INSERT INTO menu_items (name, category_id, price, description, image_url, rating, review_count, stock, is_available)
+                         VALUES (:name, :category_id, :price, :description, :image_url, :rating, :review_count, :stock, :is_available)"
                     );
                     $stmt->execute([
                         ':name' => $name,
@@ -56,6 +59,8 @@ try {
                         ':price' => $price,
                         ':description' => $description,
                         ':image_url' => $imageUrl,
+                        ':rating' => $rating,
+                        ':review_count' => $reviewCount,
                         ':stock' => $stock,
                         ':is_available' => $isAvailable
                     ]);
@@ -69,10 +74,13 @@ try {
                     $name = trim($_POST['name'] ?? '');
                     $categoryId = $_POST['category_id'] !== '' ? (int) $_POST['category_id'] : null;
                     $price = (float) ($_POST['price'] ?? 0);
-                    $stock = (int) ($_POST['stock'] ?? 0);
+                    $stock = max(0, (int) ($_POST['stock'] ?? 0));
                     $description = trim($_POST['description'] ?? '');
                     $imageUrl = trim($_POST['image_url'] ?? '');
                     $isAvailable = isset($_POST['is_available']) ? 1 : 0;
+                    $ratingInput = trim($_POST['rating'] ?? '');
+                    $rating = $ratingInput === '' ? null : max(0, min(5, (float) $ratingInput));
+                    $reviewCount = max(0, (int) ($_POST['review_count'] ?? 0));
 
                     $stmt = $pdo->prepare(
                         "UPDATE menu_items
@@ -81,6 +89,8 @@ try {
                              price = :price,
                              description = :description,
                              image_url = :image_url,
+                             rating = :rating,
+                             review_count = :review_count,
                              stock = :stock,
                              is_available = :is_available
                          WHERE id = :id"
@@ -91,6 +101,8 @@ try {
                         ':price' => $price,
                         ':description' => $description,
                         ':image_url' => $imageUrl,
+                        ':rating' => $rating,
+                        ':review_count' => $reviewCount,
                         ':stock' => $stock,
                         ':is_available' => $isAvailable,
                         ':id' => $productId
@@ -912,7 +924,17 @@ if (!empty($_SESSION['flash'])) {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Stock</label>
-                        <input type="number" id="product-stock" name="stock" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <input type="number" id="product-stock" name="stock" min="0" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Rating (0-5)</label>
+                        <input type="number" id="product-rating" name="rating" min="0" max="5" step="0.1" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 4.5">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Review Count</label>
+                        <input type="number" id="product-review-count" name="review_count" min="0" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 120">
                     </div>
                 </div>
                 <div>
@@ -975,7 +997,17 @@ if (!empty($_SESSION['flash'])) {
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Stock</label>
-                            <input type="number" name="stock" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars((string) $editingProduct['stock']); ?>">
+                            <input type="number" name="stock" min="0" required class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars((string) $editingProduct['stock']); ?>">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Rating (0-5)</label>
+                            <input type="number" name="rating" min="0" max="5" step="0.1" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars((string) $editingProduct['rating']); ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Review Count</label>
+                            <input type="number" name="review_count" min="0" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="<?php echo htmlspecialchars((string) $editingProduct['review_count']); ?>">
                         </div>
                     </div>
                     <div>
