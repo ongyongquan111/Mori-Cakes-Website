@@ -46,6 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'placeOrder':
             $response = processOrder($_POST);
             break;
+        case 'contact':
+            $response = handleContactMessage($_POST);
+            break;
         default:
             $response = ['success' => false, 'message' => 'Invalid action'];
     }
@@ -184,6 +187,34 @@ function handleRegister($postData) {
         return ['success' => true, 'message' => 'Registration successful'];
     } else {
         return ['success' => false, 'message' => 'Registration failed. Please try again.'];
+    }
+}
+
+// Handle contact form submission
+function handleContactMessage($postData) {
+    global $pdo;
+
+    $name = trim($postData['name'] ?? '');
+    $email = trim($postData['email'] ?? '');
+    $subject = trim($postData['subject'] ?? '');
+    $message = trim($postData['message'] ?? '');
+
+    if (empty($name) || empty($email) || empty($subject) || empty($message)) {
+        return ['success' => false, 'message' => 'All fields are required'];
+    }
+
+    if (!$pdo) {
+        return ['success' => false, 'message' => 'Unable to send message right now'];
+    }
+
+    try {
+        $sql = "INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$name, $email, $subject, $message]);
+        return ['success' => true, 'message' => 'Message sent successfully'];
+    } catch (PDOException $e) {
+        error_log("Database error in handleContactMessage: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Failed to send message. Please try again.'];
     }
 }
 
@@ -708,22 +739,22 @@ $allMenuItems = getMenuItems();
               <form id="contact-form" class="space-y-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-                  <input type="text" class="input-primary w-full" placeholder="Enter your name" required>
+                  <input type="text" id="contact-name" class="input-primary w-full" placeholder="Enter your name" required>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Your Email</label>
-                  <input type="email" class="input-primary w-full" placeholder="Enter your email" required>
+                  <input type="email" id="contact-email" class="input-primary w-full" placeholder="Enter your email" required>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                  <input type="text" class="input-primary w-full" placeholder="Enter subject" required>
+                  <input type="text" id="contact-subject" class="input-primary w-full" placeholder="Enter subject" required>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                  <textarea class="input-primary w-full" rows="4" placeholder="Enter your message" required></textarea>
+                  <textarea id="contact-message" class="input-primary w-full" rows="4" placeholder="Enter your message" required></textarea>
                 </div>
                 
                 <button type="submit" class="btn-primary w-full">
@@ -1236,8 +1267,37 @@ $allMenuItems = getMenuItems();
       if (contactForm) {
         contactForm.addEventListener('submit', function(e) {
           e.preventDefault();
-          showNotification('Thank you for your message! We will get back to you soon.', 'success');
-          contactForm.reset();
+          const name = document.getElementById('contact-name').value;
+          const email = document.getElementById('contact-email').value;
+          const subject = document.getElementById('contact-subject').value;
+          const message = document.getElementById('contact-message').value;
+
+          fetch('index.php', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+              action: 'contact',
+              name: name,
+              email: email,
+              subject: subject,
+              message: message
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              showNotification(data.message || 'Thank you for your message! We will get back to you soon.', 'success');
+              contactForm.reset();
+            } else {
+              showNotification(data.message || 'Failed to send message. Please try again.', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Contact form error:', error);
+            showNotification('Failed to send message. Please try again.', 'error');
+          });
         });
       }
     }

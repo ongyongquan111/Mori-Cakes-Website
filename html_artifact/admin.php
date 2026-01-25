@@ -1,3 +1,84 @@
+<?php
+session_start();
+
+$host = 'localhost';
+$dbname = 'mori_cakes';
+$username = 'root';
+$password = '';
+
+$pdo = null;
+$ordersData = [];
+$productsData = [];
+$usersData = [];
+$adminsData = [];
+$categoriesData = [];
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+    $ordersStmt = $pdo->query(
+        "SELECT o.*, 
+                u.full_name AS customer_name,
+                u.email AS customer_email,
+                u.phone AS customer_phone,
+                u.address AS customer_address
+         FROM orders o
+         LEFT JOIN users u ON o.user_id = u.id
+         ORDER BY o.created_at DESC"
+    );
+    $ordersData = $ordersStmt->fetchAll();
+
+    $itemsStmt = $pdo->query(
+        "SELECT oi.*, mi.name AS item_name
+         FROM order_items oi
+         LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id"
+    );
+    $orderItems = $itemsStmt->fetchAll();
+    $itemsByOrder = [];
+    foreach ($orderItems as $item) {
+        $itemsByOrder[$item['order_id']][] = [
+            'id' => $item['id'],
+            'menu_item_id' => $item['menu_item_id'],
+            'quantity' => (int) $item['quantity'],
+            'price' => (float) $item['price'],
+            'name' => $item['item_name']
+        ];
+    }
+
+    foreach ($ordersData as &$order) {
+        $orderId = $order['id'];
+        $order['order_id'] = 'ORD-' . date('Ymd', strtotime($order['created_at'])) . '-' . str_pad($orderId, 4, '0', STR_PAD_LEFT);
+        $order['total'] = (float) $order['total_amount'];
+        $order['items'] = $itemsByOrder[$orderId] ?? [];
+        $order['customer_name'] = $order['customer_name'] ?: $order['recipient_name'];
+        $order['customer_email'] = $order['customer_email'] ?: '';
+        $order['customer_phone'] = $order['customer_phone'] ?: $order['recipient_phone'];
+        $order['customer_address'] = $order['customer_address'] ?: $order['recipient_address'];
+    }
+    unset($order);
+
+    $productsStmt = $pdo->query(
+        "SELECT mi.*, c.name AS category
+         FROM menu_items mi
+         LEFT JOIN categories c ON mi.category_id = c.id
+         ORDER BY mi.id ASC"
+    );
+    $productsData = $productsStmt->fetchAll();
+
+    $usersStmt = $pdo->query("SELECT * FROM users ORDER BY created_at DESC");
+    $usersData = $usersStmt->fetchAll();
+
+    $adminsStmt = $pdo->query("SELECT * FROM users WHERE role = 'admin' ORDER BY created_at DESC");
+    $adminsData = $adminsStmt->fetchAll();
+
+    $categoriesStmt = $pdo->query("SELECT * FROM categories ORDER BY id ASC");
+    $categoriesData = $categoriesStmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("Database connection error: " . $e->getMessage());
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -424,7 +505,7 @@
                         <table class="min-w-full">
                             <thead>
                                 <tr class="border-b">
-                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Admin ID</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">No.</th>
                                     <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Full Name</th>
                                     <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Email</th>
                                     <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Username</th>
@@ -603,20 +684,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 
     <script>
-        // Database connection configuration
-        const dbConfig = {
-            host: 'localhost',
-            user: 'root',
-            password: '',
-            database: 'mori_cakes'
-        };
-
         // Data storage for retrieved data
-        let orders = [];
-        let products = [];
-        let users = [];
-        let admins = [];
-        let categories = [];
+        let orders = <?php echo json_encode($ordersData); ?>;
+        let products = <?php echo json_encode($productsData); ?>;
+        let users = <?php echo json_encode($usersData); ?>;
+        let admins = <?php echo json_encode($adminsData); ?>;
+        let categories = <?php echo json_encode($categoriesData); ?>;
 
         // DOM elements
         const elements = {
@@ -654,22 +727,16 @@
             // Show loading states for all sections
             showLoadingStates();
             
-            // Load data from database
-            loadDataFromDatabase().then(() => {
-                // Initialize dashboard with real data
-                loadDashboardStats();
-                loadRecentOrders();
-                initOrderStatusChart();
-                
-                // Initialize other sections
-                loadAllOrders();
-                loadProducts();
-                loadUsers();
-                loadAdmins();
-            }).catch(error => {
-                console.error('Error loading data:', error);
-                showNotification('Failed to load data. Please refresh the page.', 'error');
-            });
+            // Initialize dashboard with real data
+            loadDashboardStats();
+            loadRecentOrders();
+            initOrderStatusChart();
+            
+            // Initialize other sections
+            loadAllOrders();
+            loadProducts();
+            loadUsers();
+            loadAdmins();
         }
 
         // Show loading states for all sections
@@ -1407,7 +1474,7 @@
         function loadAdmins() {
             const adminsHtml = admins.map(admin => `
                 <tr class="border-b hover:bg-gray-50">
-                    <td class="py-3 px-4">${admin.id}</td>
+                    <td class="py-3 px-4">${index + 1}</td>
                     <td class="py-3 px-4">${admin.full_name}</td>
                     <td class="py-3 px-4">${admin.email}</td>
                     <td class="py-3 px-4">${admin.username}</td>
