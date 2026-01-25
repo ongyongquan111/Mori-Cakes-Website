@@ -785,6 +785,8 @@
                                 updated_at: '2024-01-20 15:00:00',
                                 customer_name: 'John Doe',
                                 customer_email: 'john@example.com',
+                                customer_phone: '+6012-345-6789',
+                                customer_address: '123 Main St, Kuala Lumpur',
                                 items: [
                                     { id: 1, menu_item_id: 1, quantity: 1, price: 45.00, name: 'Classic Cheesecake' },
                                     { id: 2, menu_item_id: 3, quantity: 1, price: 58.50, name: 'Chocolate Truffle Cake' },
@@ -809,11 +811,16 @@
                                 updated_at: '2024-01-20 09:15:45',
                                 customer_name: 'Jane Smith',
                                 customer_email: 'jane@example.com',
+                                customer_phone: '+6019-876-5432',
+                                customer_address: '456 Oak Ave, Petaling Jaya',
                                 items: [
                                     { id: 4, menu_item_id: 4, quantity: 2, price: 42.50, name: 'Matcha Green Tea Cake' }
                                 ]
                             }
-                        ];
+                        ].map(order => ({
+                            ...order,
+                            total: order.total_amount
+                        }));
                         
                         console.log('Orders loaded:', orders.length);
                         resolve();
@@ -999,10 +1006,10 @@
 
         // Load dashboard statistics
         function loadDashboardStats() {
-            const totalOrders = mockData.orders.length;
-            const totalRevenue = mockData.orders.reduce((sum, order) => sum + order.total, 0);
-            const totalProducts = mockData.products.length;
-            const totalUsers = mockData.users.length;
+            const totalOrders = orders.length;
+            const totalRevenue = orders.reduce((sum, order) => sum + (order.total || order.total_amount || 0), 0);
+            const totalProducts = products.length;
+            const totalUsers = users.length;
 
             document.getElementById('total-orders').textContent = totalOrders;
             document.getElementById('total-revenue').textContent = `RM${totalRevenue.toFixed(2)}`;
@@ -1012,13 +1019,13 @@
 
         // Load recent orders for dashboard
         function loadRecentOrders() {
-            const recentOrders = mockData.orders.slice(0, 5);
+            const recentOrders = orders.slice(0, 5);
             const ordersHtml = recentOrders.map(order => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${order.order_id}</td>
                     <td class="py-3 px-4">${order.customer_name}</td>
                     <td class="py-3 px-4">${formatDate(order.created_at)}</td>
-                    <td class="py-3 px-4">RM${order.total.toFixed(2)}</td>
+                    <td class="py-3 px-4">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
                     <td class="py-3 px-4">
                         <span class="status-badge status-${order.status}">${capitalizeFirstLetter(order.status)}</span>
                     </td>
@@ -1034,10 +1041,10 @@
             
             // Count orders by status
             const statusCounts = {
-                pending: mockData.orders.filter(order => order.status === 'pending').length,
-                processing: mockData.orders.filter(order => order.status === 'processing').length,
-                delivered: mockData.orders.filter(order => order.status === 'delivered').length,
-                cancelled: mockData.orders.filter(order => order.status === 'cancelled').length
+                pending: orders.filter(order => order.status === 'pending').length,
+                processing: orders.filter(order => order.status === 'processing').length,
+                delivered: orders.filter(order => order.status === 'delivered').length,
+                cancelled: orders.filter(order => order.status === 'cancelled').length
             };
 
             new Chart(ctx, {
@@ -1075,12 +1082,12 @@
 
         // Load all orders
         function loadAllOrders() {
-            const ordersHtml = mockData.orders.map(order => `
+            const ordersHtml = orders.map(order => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${order.order_id}</td>
                     <td class="py-3 px-4">${order.customer_name}</td>
                     <td class="py-3 px-4">${formatDate(order.created_at)}</td>
-                    <td class="py-3 px-4">RM${order.total.toFixed(2)}</td>
+                    <td class="py-3 px-4">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
                     <td class="py-3 px-4">
                         <span class="status-badge status-${order.status}">${capitalizeFirstLetter(order.status)}</span>
                     </td>
@@ -1096,8 +1103,8 @@
             `).join('');
 
             document.getElementById('all-orders').innerHTML = ordersHtml;
-            document.getElementById('orders-showing').textContent = mockData.orders.length;
-            document.getElementById('orders-total').textContent = mockData.orders.length;
+            document.getElementById('orders-showing').textContent = orders.length;
+            document.getElementById('orders-total').textContent = orders.length;
         }
 
         // Filter orders
@@ -1105,7 +1112,7 @@
             const searchTerm = document.getElementById('order-search').value.toLowerCase();
             const statusFilter = document.getElementById('order-status-filter').value;
 
-            const filteredOrders = mockData.orders.filter(order => {
+            const filteredOrders = orders.filter(order => {
                 const matchesSearch = order.order_id.toLowerCase().includes(searchTerm) ||
                                      order.customer_name.toLowerCase().includes(searchTerm) ||
                                      order.customer_email.toLowerCase().includes(searchTerm);
@@ -1119,7 +1126,7 @@
                     <td class="py-3 px-4">${order.order_id}</td>
                     <td class="py-3 px-4">${order.customer_name}</td>
                     <td class="py-3 px-4">${formatDate(order.created_at)}</td>
-                    <td class="py-3 px-4">RM${order.total.toFixed(2)}</td>
+                    <td class="py-3 px-4">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
                     <td class="py-3 px-4">
                         <span class="status-badge status-${order.status}">${capitalizeFirstLetter(order.status)}</span>
                     </td>
@@ -1140,7 +1147,7 @@
 
         // View order detail
         function viewOrderDetail(orderId) {
-            const order = mockData.orders.find(o => o.id === orderId);
+            const order = orders.find(o => o.id === orderId);
             if (!order) return;
 
             const orderDetailHtml = `
@@ -1196,12 +1203,12 @@
                                 `).join('')}
                                 <tr>
                                     <td colspan="3" class="py-2 px-4 text-right font-medium">Total:</td>
-                                    <td class="py-2 px-4 font-medium">RM${order.total.toFixed(2)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                                <td class="py-2 px-4 font-medium">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+            </div>
                 
                 <div class="mt-6 flex justify-end space-x-4">
                     <button class="btn-primary" onclick="updateOrderStatus(${order.id})">
@@ -1224,7 +1231,7 @@
 
         // Update order status
         function updateOrderStatus(orderId) {
-            const order = mockData.orders.find(o => o.id === orderId);
+            const order = orders.find(o => o.id === orderId);
             if (!order) return;
 
             const newStatus = prompt('Enter new status (pending, processing, delivered, cancelled):', order.status);
@@ -1250,15 +1257,15 @@
 
         // Load products
         function loadProducts() {
-            const productsHtml = mockData.products.map(product => `
+            const productsHtml = products.map(product => `
                 <div class="card overflow-hidden">
-                    <img src="${product.image}" alt="${product.name}" class="w-full h-48 object-cover">
+                    <img src="${product.image_url}" alt="${product.name}" class="w-full h-48 object-cover">
                     <div class="p-4">
                         <h4 class="font-bold text-dark mb-2">${product.name}</h4>
                         <p class="text-sm text-gray-600 mb-2">${product.category}</p>
                         <div class="flex justify-between items-center mb-4">
-                            <span class="font-bold text-primary">RM${product.price.toFixed(2)}</span>
-                            <span class="text-sm text-gray-500">Stock: ${product.stock}</span>
+                            <span class="font-bold text-primary">RM${Number(product.price || 0).toFixed(2)}</span>
+                            <span class="text-sm text-gray-500">Stock: ${product.stock ?? 0}</span>
                         </div>
                         <div class="flex space-x-2">
                             <button class="btn-primary text-sm flex-1" onclick="editProduct(${product.id})">
@@ -1308,15 +1315,16 @@
             const image = document.getElementById('product-image').value;
 
             const newProduct = {
-                id: mockData.products.length + 1,
+                id: products.length + 1,
                 name,
                 category,
                 price,
                 stock,
-                image
+                image_url: image,
+                description
             };
 
-            mockData.products.push(newProduct);
+            products.push(newProduct);
             alert('Product added successfully!');
             closeAddProductModal();
             loadProducts();
@@ -1325,7 +1333,7 @@
 
         // Load users
         function loadUsers() {
-            const usersHtml = mockData.users.map(user => `
+            const usersHtml = users.map(user => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${user.id}</td>
                     <td class="py-3 px-4">${user.full_name}</td>
@@ -1354,7 +1362,7 @@
         function filterUsers() {
             const searchTerm = document.getElementById('user-search').value.toLowerCase();
 
-            const filteredUsers = mockData.users.filter(user => 
+            const filteredUsers = users.filter(user => 
                 user.full_name.toLowerCase().includes(searchTerm) ||
                 user.email.toLowerCase().includes(searchTerm) ||
                 user.username.toLowerCase().includes(searchTerm)
@@ -1397,7 +1405,7 @@
 
         // Load admins
         function loadAdmins() {
-            const adminsHtml = mockData.admins.map(admin => `
+            const adminsHtml = admins.map(admin => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${admin.id}</td>
                     <td class="py-3 px-4">${admin.full_name}</td>
@@ -1437,13 +1445,13 @@
             const password = document.getElementById('admin-password').value;
 
             // Check if admin already exists
-            if (mockData.admins.some(admin => admin.email === email || admin.username === username)) {
+            if (admins.some(admin => admin.email === email || admin.username === username)) {
                 alert('Admin with this email or username already exists!');
                 return;
             }
 
             const newAdmin = {
-                id: mockData.admins.length + 1,
+                id: admins.length + 1,
                 full_name: fullName,
                 email: email,
                 username: username,
@@ -1452,9 +1460,9 @@
                 created_at: new Date().toISOString().split('T')[0]
             };
 
-            mockData.admins.push(newAdmin);
-            mockData.users.push({
-                id: mockData.users.length + 1,
+            admins.push(newAdmin);
+            users.push({
+                id: users.length + 1,
                 full_name: fullName,
                 email: email,
                 username: username,
@@ -1474,18 +1482,18 @@
 
         // Delete admin
         function deleteAdmin(adminId) {
-            if (mockData.admins.length <= 1) {
+            if (admins.length <= 1) {
                 alert('Cannot delete the last admin account!');
                 return;
             }
 
             if (confirm('Are you sure you want to delete this admin account?')) {
-                const admin = mockData.admins.find(a => a.id === adminId);
+                const admin = admins.find(a => a.id === adminId);
                 if (admin) {
                     // Remove from admins array
-                    mockData.admins = mockData.admins.filter(a => a.id !== adminId);
+                    admins = admins.filter(a => a.id !== adminId);
                     // Remove from users array
-                    mockData.users = mockData.users.filter(u => !(u.email === admin.email && u.role === 'admin'));
+                    users = users.filter(u => !(u.email === admin.email && u.role === 'admin'));
                     
                     alert('Admin account deleted successfully!');
                     loadAdmins();
