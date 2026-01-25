@@ -1,3 +1,84 @@
+<?php
+session_start();
+
+$host = 'localhost';
+$dbname = 'mori_cakes';
+$username = 'root';
+$password = '';
+
+$pdo = null;
+$ordersData = [];
+$productsData = [];
+$usersData = [];
+$adminsData = [];
+$categoriesData = [];
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+    $ordersStmt = $pdo->query(
+        "SELECT o.*, 
+                u.full_name AS customer_name,
+                u.email AS customer_email,
+                u.phone AS customer_phone,
+                u.address AS customer_address
+         FROM orders o
+         LEFT JOIN users u ON o.user_id = u.id
+         ORDER BY o.created_at DESC"
+    );
+    $ordersData = $ordersStmt->fetchAll();
+
+    $itemsStmt = $pdo->query(
+        "SELECT oi.*, mi.name AS item_name
+         FROM order_items oi
+         LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id"
+    );
+    $orderItems = $itemsStmt->fetchAll();
+    $itemsByOrder = [];
+    foreach ($orderItems as $item) {
+        $itemsByOrder[$item['order_id']][] = [
+            'id' => $item['id'],
+            'menu_item_id' => $item['menu_item_id'],
+            'quantity' => (int) $item['quantity'],
+            'price' => (float) $item['price'],
+            'name' => $item['item_name']
+        ];
+    }
+
+    foreach ($ordersData as &$order) {
+        $orderId = $order['id'];
+        $order['order_id'] = 'ORD-' . date('Ymd', strtotime($order['created_at'])) . '-' . str_pad($orderId, 4, '0', STR_PAD_LEFT);
+        $order['total'] = (float) $order['total_amount'];
+        $order['items'] = $itemsByOrder[$orderId] ?? [];
+        $order['customer_name'] = $order['customer_name'] ?: $order['recipient_name'];
+        $order['customer_email'] = $order['customer_email'] ?: '';
+        $order['customer_phone'] = $order['customer_phone'] ?: $order['recipient_phone'];
+        $order['customer_address'] = $order['customer_address'] ?: $order['recipient_address'];
+    }
+    unset($order);
+
+    $productsStmt = $pdo->query(
+        "SELECT mi.*, c.name AS category
+         FROM menu_items mi
+         LEFT JOIN categories c ON mi.category_id = c.id
+         ORDER BY mi.id ASC"
+    );
+    $productsData = $productsStmt->fetchAll();
+
+    $usersStmt = $pdo->query("SELECT * FROM users ORDER BY created_at DESC");
+    $usersData = $usersStmt->fetchAll();
+
+    $adminsStmt = $pdo->query("SELECT * FROM users WHERE role = 'admin' ORDER BY created_at DESC");
+    $adminsData = $adminsStmt->fetchAll();
+
+    $categoriesStmt = $pdo->query("SELECT * FROM categories ORDER BY id ASC");
+    $categoriesData = $categoriesStmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("Database connection error: " . $e->getMessage());
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -424,7 +505,7 @@
                         <table class="min-w-full">
                             <thead>
                                 <tr class="border-b">
-                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Admin ID</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">No.</th>
                                     <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Full Name</th>
                                     <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Email</th>
                                     <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Username</th>
@@ -603,20 +684,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 
     <script>
-        // Database connection configuration
-        const dbConfig = {
-            host: 'localhost',
-            user: 'root',
-            password: '',
-            database: 'mori_cakes'
-        };
-
         // Data storage for retrieved data
-        let orders = [];
-        let products = [];
-        let users = [];
-        let admins = [];
-        let categories = [];
+        let orders = <?php echo json_encode($ordersData); ?>;
+        let products = <?php echo json_encode($productsData); ?>;
+        let users = <?php echo json_encode($usersData); ?>;
+        let admins = <?php echo json_encode($adminsData); ?>;
+        let categories = <?php echo json_encode($categoriesData); ?>;
 
         // DOM elements
         const elements = {
@@ -654,22 +727,16 @@
             // Show loading states for all sections
             showLoadingStates();
             
-            // Load data from database
-            loadDataFromDatabase().then(() => {
-                // Initialize dashboard with real data
-                loadDashboardStats();
-                loadRecentOrders();
-                initOrderStatusChart();
-                
-                // Initialize other sections
-                loadAllOrders();
-                loadProducts();
-                loadUsers();
-                loadAdmins();
-            }).catch(error => {
-                console.error('Error loading data:', error);
-                showNotification('Failed to load data. Please refresh the page.', 'error');
-            });
+            // Initialize dashboard with real data
+            loadDashboardStats();
+            loadRecentOrders();
+            initOrderStatusChart();
+            
+            // Initialize other sections
+            loadAllOrders();
+            loadProducts();
+            loadUsers();
+            loadAdmins();
         }
 
         // Show loading states for all sections
@@ -729,196 +796,6 @@
             `;
         }
 
-        // Load data from database
-        async function loadDataFromDatabase() {
-            try {
-                // Simulate API calls to get data from database
-                // In a real application, these would be actual AJAX calls to PHP endpoints
-                
-                // Load orders
-                await loadOrdersFromDatabase();
-                
-                // Load products
-                await loadProductsFromDatabase();
-                
-                // Load users
-                await loadUsersFromDatabase();
-                
-                // Load admins
-                await loadAdminsFromDatabase();
-                
-                // Load categories
-                await loadCategoriesFromDatabase();
-                
-                console.log('All data loaded successfully');
-            } catch (error) {
-                console.error('Error loading data from database:', error);
-                throw error;
-            }
-        }
-
-        // Load orders from database
-        async function loadOrdersFromDatabase() {
-            return new Promise((resolve, reject) => {
-                // Simulate API call delay
-                setTimeout(() => {
-                    try {
-                        // In a real application, this would be an AJAX call to get orders from database
-                        // For now, we'll use sample data structure that matches the database schema
-                        
-                        orders = [
-                            {
-                                id: 1,
-                                order_id: 'ORD-2024-001',
-                                user_id: 1,
-                                total_amount: 128.50,
-                                recipient_name: 'John Doe',
-                                recipient_phone: '+6012-345-6789',
-                                recipient_address: '123 Main St, Kuala Lumpur',
-                                delivery_date: '2024-01-20',
-                                delivery_time: '14:30 - 15:30',
-                                special_instructions: 'Please deliver to the main entrance',
-                                status: 'delivered',
-                                payment_method: 'Credit Card',
-                                payment_status: 'paid',
-                                created_at: '2024-01-19 10:25:30',
-                                updated_at: '2024-01-20 15:00:00',
-                                customer_name: 'John Doe',
-                                customer_email: 'john@example.com',
-                                items: [
-                                    { id: 1, menu_item_id: 1, quantity: 1, price: 45.00, name: 'Classic Cheesecake' },
-                                    { id: 2, menu_item_id: 3, quantity: 1, price: 58.50, name: 'Chocolate Truffle Cake' },
-                                    { id: 3, menu_item_id: 5, quantity: 1, price: 25.00, name: 'Strawberry Shortcake' }
-                                ]
-                            },
-                            {
-                                id: 2,
-                                order_id: 'ORD-2024-002',
-                                user_id: 2,
-                                total_amount: 85.00,
-                                recipient_name: 'Jane Smith',
-                                recipient_phone: '+6019-876-5432',
-                                recipient_address: '456 Oak Ave, Petaling Jaya',
-                                delivery_date: '2024-01-21',
-                                delivery_time: '10:00 - 11:00',
-                                special_instructions: '',
-                                status: 'processing',
-                                payment_method: 'Online Banking',
-                                payment_status: 'paid',
-                                created_at: '2024-01-20 09:15:45',
-                                updated_at: '2024-01-20 09:15:45',
-                                customer_name: 'Jane Smith',
-                                customer_email: 'jane@example.com',
-                                items: [
-                                    { id: 4, menu_item_id: 4, quantity: 2, price: 42.50, name: 'Matcha Green Tea Cake' }
-                                ]
-                            }
-                        ];
-                        
-                        console.log('Orders loaded:', orders.length);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                }, 500);
-            });
-        }
-
-        // Load products from database
-        async function loadProductsFromDatabase() {
-            return new Promise((resolve, reject) => {
-                // Simulate API call delay
-                setTimeout(() => {
-                    try {
-                        // In a real application, this would be an AJAX call to get products from database
-                        products = [
-                            { id: 1, name: 'Classic Cheesecake', category_id: 1, price: 45.00, description: 'Creamy New York style cheesecake with a graham cracker crust', image_url: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.8, review_count: 156, is_available: true, category: 'Cheese Cake', stock: 20 },
-                            { id: 2, name: 'Strawberry Shortcake', category_id: 2, price: 25.00, description: 'Fresh strawberries layered with vanilla sponge cake and whipped cream', image_url: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.6, review_count: 98, is_available: true, category: 'Strawberry Cake', stock: 25 },
-                            { id: 3, name: 'Chocolate Truffle Cake', category_id: 3, price: 58.50, description: 'Rich chocolate cake with truffle ganache filling and chocolate shavings', image_url: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.9, review_count: 203, is_available: true, category: 'Chocolate Cake', stock: 15 },
-                            { id: 4, name: 'Matcha Green Tea Cake', category_id: 4, price: 42.50, description: 'Japanese matcha cake with red bean paste and green tea cream', image_url: 'https://images.unsplash.com/photo-1543363136-010fb91c6448?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.7, review_count: 87, is_available: true, category: 'Matcha Cake', stock: 18 },
-                            { id: 5, name: 'Coffee Cake', category_id: 5, price: 45.00, description: 'Moist coffee cake with walnuts and cinnamon streusel', image_url: 'https://images.unsplash.com/photo-1558326567-9883f6a32916?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.5, review_count: 112, is_available: true, category: 'Coffee Cake', stock: 22 },
-                            { id: 6, name: 'Vanilla Cake', category_id: 6, price: 40.00, description: 'Classic vanilla cake with buttercream frosting and sprinkles', image_url: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?q=80&w=200&h=200&auto=format&fit=crop', rating: 4.4, review_count: 76, is_available: true, category: 'Vanilla Cake', stock: 30 }
-                        ];
-                        
-                        console.log('Products loaded:', products.length);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                }, 300);
-            });
-        }
-
-        // Load users from database
-        async function loadUsersFromDatabase() {
-            return new Promise((resolve, reject) => {
-                // Simulate API call delay
-                setTimeout(() => {
-                    try {
-                        // In a real application, this would be an AJAX call to get users from database
-                        users = [
-                            { id: 1, username: 'user', password: 'user123', email: 'user@moricakes.com', full_name: 'Test User', phone: '+6012-345-6789', address: '123 Test St, Kuala Lumpur', role: 'user', created_at: '2024-01-01 00:00:00', updated_at: '2024-01-01 00:00:00' },
-                            { id: 2, username: 'john_doe', password: 'password123', email: 'john@example.com', full_name: 'John Doe', phone: '+6012-345-6789', address: '123 Main St, Kuala Lumpur', role: 'user', created_at: '2024-01-15 10:30:00', updated_at: '2024-01-15 10:30:00' },
-                            { id: 3, username: 'jane_smith', password: 'password123', email: 'jane@example.com', full_name: 'Jane Smith', phone: '+6019-876-5432', address: '456 Oak Ave, Petaling Jaya', role: 'user', created_at: '2024-01-18 14:20:00', updated_at: '2024-01-18 14:20:00' }
-                        ];
-                        
-                        console.log('Users loaded:', users.length);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                }, 200);
-            });
-        }
-
-        // Load admins from database
-        async function loadAdminsFromDatabase() {
-            return new Promise((resolve, reject) => {
-                // Simulate API call delay
-                setTimeout(() => {
-                    try {
-                        // In a real application, this would be an AJAX call to get admins from database
-                        admins = [
-                            { id: 1, username: 'admin', password: 'admin123', email: 'admin@moricakes.com', full_name: 'Admin User', phone: '', address: '', role: 'admin', created_at: '2023-12-31 00:00:00', updated_at: '2023-12-31 00:00:00' },
-                            { id: 4, username: '242UT2449E', password: 'pw0001', email: 'admin1@moricakes.com', full_name: 'Yap Shi Tong', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' },
-                            { id: 5, username: '242UT2449F', password: 'pw0002', email: 'admin2@moricakes.com', full_name: 'Jamie Lim Shi Ting', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' },
-                            { id: 6, username: '243UT246XG', password: 'pw0003', email: 'admin3@moricakes.com', full_name: 'Ong Yong Quan', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' },
-                            { id: 7, username: '1201302385', password: 'pw0004', email: 'admin4@moricakes.com', full_name: 'Mohamed Abdelgabar Mohamed Awad', phone: '', address: '', role: 'admin', created_at: '2024-01-20 00:00:00', updated_at: '2024-01-20 00:00:00' }
-                        ];
-                        
-                        console.log('Admins loaded:', admins.length);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                }, 200);
-            });
-        }
-
-        // Load categories from database
-        async function loadCategoriesFromDatabase() {
-            return new Promise((resolve, reject) => {
-                // Simulate API call delay
-                setTimeout(() => {
-                    try {
-                        // In a real application, this would be an AJAX call to get categories from database
-                        categories = [
-                            { id: 1, name: 'cheese', description: 'Delicious cheesecakes', created_at: '2023-12-31 00:00:00' },
-                            { id: 2, name: 'strawberry', description: 'Fresh strawberry cakes', created_at: '2023-12-31 00:00:00' },
-                            { id: 3, name: 'chocolate', description: 'Rich chocolate cakes', created_at: '2023-12-31 00:00:00' },
-                            { id: 4, name: 'matcha', description: 'Japanese matcha cakes', created_at: '2023-12-31 00:00:00' },
-                            { id: 5, name: 'coffee', description: 'Coffee flavored cakes', created_at: '2023-12-31 00:00:00' },
-                            { id: 6, name: 'vanilla', description: 'Classic vanilla cakes', created_at: '2023-12-31 00:00:00' }
-                        ];
-                        
-                        console.log('Categories loaded:', categories.length);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                }, 100);
-            });
-        }
 
         // Check if user is logged in as admin
         function checkAdminLogin() {
@@ -999,10 +876,10 @@
 
         // Load dashboard statistics
         function loadDashboardStats() {
-            const totalOrders = mockData.orders.length;
-            const totalRevenue = mockData.orders.reduce((sum, order) => sum + order.total, 0);
-            const totalProducts = mockData.products.length;
-            const totalUsers = mockData.users.length;
+            const totalOrders = orders.length;
+            const totalRevenue = orders.reduce((sum, order) => sum + (order.total || order.total_amount || 0), 0);
+            const totalProducts = products.length;
+            const totalUsers = users.length;
 
             document.getElementById('total-orders').textContent = totalOrders;
             document.getElementById('total-revenue').textContent = `RM${totalRevenue.toFixed(2)}`;
@@ -1012,13 +889,13 @@
 
         // Load recent orders for dashboard
         function loadRecentOrders() {
-            const recentOrders = mockData.orders.slice(0, 5);
+            const recentOrders = orders.slice(0, 5);
             const ordersHtml = recentOrders.map(order => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${order.order_id}</td>
                     <td class="py-3 px-4">${order.customer_name}</td>
                     <td class="py-3 px-4">${formatDate(order.created_at)}</td>
-                    <td class="py-3 px-4">RM${order.total.toFixed(2)}</td>
+                    <td class="py-3 px-4">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
                     <td class="py-3 px-4">
                         <span class="status-badge status-${order.status}">${capitalizeFirstLetter(order.status)}</span>
                     </td>
@@ -1034,10 +911,10 @@
             
             // Count orders by status
             const statusCounts = {
-                pending: mockData.orders.filter(order => order.status === 'pending').length,
-                processing: mockData.orders.filter(order => order.status === 'processing').length,
-                delivered: mockData.orders.filter(order => order.status === 'delivered').length,
-                cancelled: mockData.orders.filter(order => order.status === 'cancelled').length
+                pending: orders.filter(order => order.status === 'pending').length,
+                processing: orders.filter(order => order.status === 'processing').length,
+                delivered: orders.filter(order => order.status === 'delivered').length,
+                cancelled: orders.filter(order => order.status === 'cancelled').length
             };
 
             new Chart(ctx, {
@@ -1075,12 +952,12 @@
 
         // Load all orders
         function loadAllOrders() {
-            const ordersHtml = mockData.orders.map(order => `
+            const ordersHtml = orders.map(order => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${order.order_id}</td>
                     <td class="py-3 px-4">${order.customer_name}</td>
                     <td class="py-3 px-4">${formatDate(order.created_at)}</td>
-                    <td class="py-3 px-4">RM${order.total.toFixed(2)}</td>
+                    <td class="py-3 px-4">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
                     <td class="py-3 px-4">
                         <span class="status-badge status-${order.status}">${capitalizeFirstLetter(order.status)}</span>
                     </td>
@@ -1096,8 +973,8 @@
             `).join('');
 
             document.getElementById('all-orders').innerHTML = ordersHtml;
-            document.getElementById('orders-showing').textContent = mockData.orders.length;
-            document.getElementById('orders-total').textContent = mockData.orders.length;
+            document.getElementById('orders-showing').textContent = orders.length;
+            document.getElementById('orders-total').textContent = orders.length;
         }
 
         // Filter orders
@@ -1105,7 +982,7 @@
             const searchTerm = document.getElementById('order-search').value.toLowerCase();
             const statusFilter = document.getElementById('order-status-filter').value;
 
-            const filteredOrders = mockData.orders.filter(order => {
+            const filteredOrders = orders.filter(order => {
                 const matchesSearch = order.order_id.toLowerCase().includes(searchTerm) ||
                                      order.customer_name.toLowerCase().includes(searchTerm) ||
                                      order.customer_email.toLowerCase().includes(searchTerm);
@@ -1119,7 +996,7 @@
                     <td class="py-3 px-4">${order.order_id}</td>
                     <td class="py-3 px-4">${order.customer_name}</td>
                     <td class="py-3 px-4">${formatDate(order.created_at)}</td>
-                    <td class="py-3 px-4">RM${order.total.toFixed(2)}</td>
+                    <td class="py-3 px-4">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
                     <td class="py-3 px-4">
                         <span class="status-badge status-${order.status}">${capitalizeFirstLetter(order.status)}</span>
                     </td>
@@ -1140,7 +1017,7 @@
 
         // View order detail
         function viewOrderDetail(orderId) {
-            const order = mockData.orders.find(o => o.id === orderId);
+            const order = orders.find(o => o.id === orderId);
             if (!order) return;
 
             const orderDetailHtml = `
@@ -1196,12 +1073,12 @@
                                 `).join('')}
                                 <tr>
                                     <td colspan="3" class="py-2 px-4 text-right font-medium">Total:</td>
-                                    <td class="py-2 px-4 font-medium">RM${order.total.toFixed(2)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                                <td class="py-2 px-4 font-medium">RM${Number(order.total || order.total_amount || 0).toFixed(2)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+            </div>
                 
                 <div class="mt-6 flex justify-end space-x-4">
                     <button class="btn-primary" onclick="updateOrderStatus(${order.id})">
@@ -1224,7 +1101,7 @@
 
         // Update order status
         function updateOrderStatus(orderId) {
-            const order = mockData.orders.find(o => o.id === orderId);
+            const order = orders.find(o => o.id === orderId);
             if (!order) return;
 
             const newStatus = prompt('Enter new status (pending, processing, delivered, cancelled):', order.status);
@@ -1250,15 +1127,15 @@
 
         // Load products
         function loadProducts() {
-            const productsHtml = mockData.products.map(product => `
+            const productsHtml = products.map(product => `
                 <div class="card overflow-hidden">
-                    <img src="${product.image}" alt="${product.name}" class="w-full h-48 object-cover">
+                    <img src="${product.image_url}" alt="${product.name}" class="w-full h-48 object-cover">
                     <div class="p-4">
                         <h4 class="font-bold text-dark mb-2">${product.name}</h4>
                         <p class="text-sm text-gray-600 mb-2">${product.category}</p>
                         <div class="flex justify-between items-center mb-4">
-                            <span class="font-bold text-primary">RM${product.price.toFixed(2)}</span>
-                            <span class="text-sm text-gray-500">Stock: ${product.stock}</span>
+                            <span class="font-bold text-primary">RM${Number(product.price || 0).toFixed(2)}</span>
+                            <span class="text-sm text-gray-500">Stock: ${product.stock ?? 0}</span>
                         </div>
                         <div class="flex space-x-2">
                             <button class="btn-primary text-sm flex-1" onclick="editProduct(${product.id})">
@@ -1308,15 +1185,16 @@
             const image = document.getElementById('product-image').value;
 
             const newProduct = {
-                id: mockData.products.length + 1,
+                id: products.length + 1,
                 name,
                 category,
                 price,
                 stock,
-                image
+                image_url: image,
+                description
             };
 
-            mockData.products.push(newProduct);
+            products.push(newProduct);
             alert('Product added successfully!');
             closeAddProductModal();
             loadProducts();
@@ -1325,7 +1203,7 @@
 
         // Load users
         function loadUsers() {
-            const usersHtml = mockData.users.map(user => `
+            const usersHtml = users.map(user => `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="py-3 px-4">${user.id}</td>
                     <td class="py-3 px-4">${user.full_name}</td>
@@ -1354,7 +1232,7 @@
         function filterUsers() {
             const searchTerm = document.getElementById('user-search').value.toLowerCase();
 
-            const filteredUsers = mockData.users.filter(user => 
+            const filteredUsers = users.filter(user => 
                 user.full_name.toLowerCase().includes(searchTerm) ||
                 user.email.toLowerCase().includes(searchTerm) ||
                 user.username.toLowerCase().includes(searchTerm)
@@ -1397,9 +1275,9 @@
 
         // Load admins
         function loadAdmins() {
-            const adminsHtml = mockData.admins.map(admin => `
+            const adminsHtml = admins.map((admin, index) => `
                 <tr class="border-b hover:bg-gray-50">
-                    <td class="py-3 px-4">${admin.id}</td>
+                    <td class="py-3 px-4">${index + 1}</td>
                     <td class="py-3 px-4">${admin.full_name}</td>
                     <td class="py-3 px-4">${admin.email}</td>
                     <td class="py-3 px-4">${admin.username}</td>
@@ -1437,13 +1315,13 @@
             const password = document.getElementById('admin-password').value;
 
             // Check if admin already exists
-            if (mockData.admins.some(admin => admin.email === email || admin.username === username)) {
+            if (admins.some(admin => admin.email === email || admin.username === username)) {
                 alert('Admin with this email or username already exists!');
                 return;
             }
 
             const newAdmin = {
-                id: mockData.admins.length + 1,
+                id: admins.length + 1,
                 full_name: fullName,
                 email: email,
                 username: username,
@@ -1452,9 +1330,9 @@
                 created_at: new Date().toISOString().split('T')[0]
             };
 
-            mockData.admins.push(newAdmin);
-            mockData.users.push({
-                id: mockData.users.length + 1,
+            admins.push(newAdmin);
+            users.push({
+                id: users.length + 1,
                 full_name: fullName,
                 email: email,
                 username: username,
@@ -1474,18 +1352,18 @@
 
         // Delete admin
         function deleteAdmin(adminId) {
-            if (mockData.admins.length <= 1) {
+            if (admins.length <= 1) {
                 alert('Cannot delete the last admin account!');
                 return;
             }
 
             if (confirm('Are you sure you want to delete this admin account?')) {
-                const admin = mockData.admins.find(a => a.id === adminId);
+                const admin = admins.find(a => a.id === adminId);
                 if (admin) {
                     // Remove from admins array
-                    mockData.admins = mockData.admins.filter(a => a.id !== adminId);
+                    admins = admins.filter(a => a.id !== adminId);
                     // Remove from users array
-                    mockData.users = mockData.users.filter(u => !(u.email === admin.email && u.role === 'admin'));
+                    users = users.filter(u => !(u.email === admin.email && u.role === 'admin'));
                     
                     alert('Admin account deleted successfully!');
                     loadAdmins();

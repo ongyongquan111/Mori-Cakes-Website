@@ -46,6 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'placeOrder':
             $response = processOrder($_POST);
             break;
+        case 'contact':
+            $response = handleContactMessage($_POST);
+            break;
         default:
             $response = ['success' => false, 'message' => 'Invalid action'];
     }
@@ -187,6 +190,34 @@ function handleRegister($postData) {
     }
 }
 
+// Handle contact form submission
+function handleContactMessage($postData) {
+    global $pdo;
+
+    $name = trim($postData['name'] ?? '');
+    $email = trim($postData['email'] ?? '');
+    $subject = trim($postData['subject'] ?? '');
+    $message = trim($postData['message'] ?? '');
+
+    if (empty($name) || empty($email) || empty($subject) || empty($message)) {
+        return ['success' => false, 'message' => 'All fields are required'];
+    }
+
+    if (!$pdo) {
+        return ['success' => false, 'message' => 'Unable to send message right now'];
+    }
+
+    try {
+        $sql = "INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$name, $email, $subject, $message]);
+        return ['success' => true, 'message' => 'Message sent successfully'];
+    } catch (PDOException $e) {
+        error_log("Database error in handleContactMessage: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Failed to send message. Please try again.'];
+    }
+}
+
 // Handle user logout
 function handleLogout() {
     session_destroy();
@@ -268,6 +299,10 @@ function processOrder($postData) {
     if (!isset($_SESSION['user'])) {
         return ['success' => false, 'message' => 'User not logged in'];
     }
+
+    if (!$pdo) {
+        return ['success' => false, 'message' => 'Order processing is currently unavailable'];
+    }
     
     try {
         $orderData = json_decode($postData['orderData'], true);
@@ -324,7 +359,7 @@ function processOrder($postData) {
         
         $formattedOrderId = 'ORD-' . date('Ymd') . '-' . str_pad($orderId, 4, '0', STR_PAD_LEFT);
         
-        $response = [
+        return [
             'success' => true,
             'orderId' => $formattedOrderId,
             'message' => 'Order placed successfully',
@@ -343,52 +378,11 @@ function processOrder($postData) {
             ]
         ];
         
-        // If database is available, save the order
-        if ($pdo && isset($_SESSION['user'])) {
-            try {
-                $pdo->beginTransaction();
-                
-                $sql = "INSERT INTO orders (user_id, total_amount, recipient_name, recipient_phone, 
-                                           recipient_address, delivery_date, status, created_at) 
-                        VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())";
-                
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $_SESSION['user']['id'],
-                    $orderData['totalAmount'],
-                    $orderData['recipientName'],
-                    $orderData['recipientPhone'],
-                    $orderData['recipientAddress'],
-                    $orderData['deliveryDate']
-                ]);
-                
-                $orderId = $pdo->lastInsertId();
-                
-                $sql = "INSERT INTO order_items (order_id, menu_item_id, quantity, price) 
-                        VALUES (?, ?, ?, ?)";
-                
-                $stmt = $pdo->prepare($sql);
-                foreach ($orderData['items'] as $item) {
-                    $stmt->execute([$orderId, $item['id'], $item['quantity'], $item['price']]);
-                }
-                
-                $pdo->commit();
-                $response['orderId'] = $orderId;
-            } catch (Exception $e) {
-                $pdo->rollBack();
-                // Continue with simulated response
-            }
-        }
-        
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        
     } catch (Exception $e) {
-        http_response_code(500);
-        echo json_encode([
+        return [
             'success' => false,
             'message' => 'Error placing order: ' . $e->getMessage()
-        ]);
+        ];
     }
 }
 
@@ -427,11 +421,11 @@ function getMenuItems($category = null) {
                 'id' => $item['id'],
                 'name' => $item['name'],
                 'category' => $item['category_name'],
-                'price' => $item['price'],
+                'price' => (float) $item['price'],
                 'image' => $item['image_url'],
                 'description' => $item['description'],
-                'rating' => $item['rating'],
-                'reviewCount' => $item['review_count']
+                'rating' => (float) $item['rating'],
+                'reviewCount' => (int) $item['review_count']
             ];
         }
         
@@ -745,22 +739,22 @@ $allMenuItems = getMenuItems();
               <form id="contact-form" class="space-y-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-                  <input type="text" class="input-primary w-full" placeholder="Enter your name" required>
+                  <input type="text" id="contact-name" class="input-primary w-full" placeholder="Enter your name" required>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Your Email</label>
-                  <input type="email" class="input-primary w-full" placeholder="Enter your email" required>
+                  <input type="email" id="contact-email" class="input-primary w-full" placeholder="Enter your email" required>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                  <input type="text" class="input-primary w-full" placeholder="Enter subject" required>
+                  <input type="text" id="contact-subject" class="input-primary w-full" placeholder="Enter subject" required>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                  <textarea class="input-primary w-full" rows="4" placeholder="Enter your message" required></textarea>
+                  <textarea id="contact-message" class="input-primary w-full" rows="4" placeholder="Enter your message" required></textarea>
                 </div>
                 
                 <button type="submit" class="btn-primary w-full">
@@ -1084,6 +1078,7 @@ $allMenuItems = getMenuItems();
       initializeEventListeners();
       updateCartUI();
       setMinDeliveryDate();
+      updateUserUI();
     }
     
     // Initialize menu
@@ -1272,8 +1267,37 @@ $allMenuItems = getMenuItems();
       if (contactForm) {
         contactForm.addEventListener('submit', function(e) {
           e.preventDefault();
-          showNotification('Thank you for your message! We will get back to you soon.', 'success');
-          contactForm.reset();
+          const name = document.getElementById('contact-name').value;
+          const email = document.getElementById('contact-email').value;
+          const subject = document.getElementById('contact-subject').value;
+          const message = document.getElementById('contact-message').value;
+
+          fetch('index.php', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+              action: 'contact',
+              name: name,
+              email: email,
+              subject: subject,
+              message: message
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              showNotification(data.message || 'Thank you for your message! We will get back to you soon.', 'success');
+              contactForm.reset();
+            } else {
+              showNotification(data.message || 'Failed to send message. Please try again.', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Contact form error:', error);
+            showNotification('Failed to send message. Please try again.', 'error');
+          });
         });
       }
     }
@@ -1734,37 +1758,38 @@ $allMenuItems = getMenuItems();
         return;
       }
       
-      // Simulate API call
-      setTimeout(() => {
-        // Check test users
-        if ((username === 'admin' && password === 'admin123') || 
-            (username === 'user' && password === 'user123')) {
-          
-          window.currentUserData = {
-            id: 1,
-            username: username,
-            email: `${username}@moricakes.com`,
-            full_name: username === 'admin' ? 'Admin User' : 'Test User',
-            role: username === 'admin' ? 'admin' : 'user'
-          };
-          
-          // Update UI
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          action: 'login',
+          username: username,
+          password: password
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.user) {
+          window.currentUserData = data.user;
           updateUserUI();
-          
           closeModal('login-modal');
           showNotification('Login successful!', 'success');
           
-          // Redirect admin to admin panel
           if (window.currentUserData.role === 'admin') {
             setTimeout(() => {
               window.location.href = 'admin.php?admin=true';
             }, 1000);
           }
-          
         } else {
-          showNotification('Invalid username or password', 'error');
+          showNotification(data.message || 'Invalid username or password', 'error');
         }
-      }, 500);
+      })
+      .catch(error => {
+        console.error('Login error:', error);
+        showNotification('Login failed. Please try again.', 'error');
+      });
     }
     
     function register() {
@@ -1778,18 +1803,59 @@ $allMenuItems = getMenuItems();
         return;
       }
       
-      // Simulate API call
-      setTimeout(() => {
-        showNotification('Registration successful! Please login.', 'success');
-        closeModal('register-modal');
-        openLoginModal();
-      }, 500);
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          action: 'register',
+          name: name,
+          username: username,
+          email: email,
+          password: password
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showNotification('Registration successful! Please login.', 'success');
+          closeModal('register-modal');
+          openLoginModal();
+        } else {
+          showNotification(data.message || 'Registration failed. Please try again.', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Registration error:', error);
+        showNotification('Registration failed. Please try again.', 'error');
+      });
     }
     
     function logout() {
-      window.currentUserData = null;
-      updateUserUI();
-      showNotification('Logged out successfully', 'info');
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          action: 'logout'
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          window.currentUserData = null;
+          updateUserUI();
+          showNotification('Logged out successfully', 'info');
+        } else {
+          showNotification(data.message || 'Logout failed. Please try again.', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Logout error:', error);
+        showNotification('Logout failed. Please try again.', 'error');
+      });
     }
     
     // Update user UI
@@ -1859,28 +1925,38 @@ $allMenuItems = getMenuItems();
         deliveryDate: date
       };
       
-      // Simulate API call
-      setTimeout(() => {
-        const orderId = 'ORD-' + date.replace(/-/g, '') + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        
-        // Clear cart
-        cart = [];
-        localStorage.removeItem('cart');
-        updateCartUI();
-        
-        // Close modals
-        closeModal('checkout-modal');
-        toggleCartDrawer(false);
-        
-        // Show success notification
-        showNotification(`Order #${orderId} placed successfully!`, 'success');
-        
-        // Show order details
-        setTimeout(() => {
-          alert(`Order Confirmation\n\nOrder ID: ${orderId}\nTotal: RM${total.toFixed(2)}\nDelivery Date: ${date}\n\nThank you for your order!`);
-        }, 500);
-        
-      }, 1000);
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          action: 'placeOrder',
+          orderData: JSON.stringify(orderData)
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const orderId = data.orderId || 'ORD-' + date.replace(/-/g, '') + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+          cart = [];
+          localStorage.removeItem('cart');
+          updateCartUI();
+          closeModal('checkout-modal');
+          toggleCartDrawer(false);
+          showNotification(`Order #${orderId} placed successfully!`, 'success');
+          
+          setTimeout(() => {
+            alert(`Order Confirmation\n\nOrder ID: ${orderId}\nTotal: RM${total.toFixed(2)}\nDelivery Date: ${date}\n\nThank you for your order!`);
+          }, 500);
+        } else {
+          showNotification(data.message || 'Failed to place order. Please try again.', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Order error:', error);
+        showNotification('Failed to place order. Please try again.', 'error');
+      });
     }
     
     // Load order history
@@ -1890,68 +1966,58 @@ $allMenuItems = getMenuItems();
       
       orderHistoryContainer.innerHTML = '<div class="text-center py-8"><i class="fa fa-spinner fa-spin text-primary text-2xl"></i><p class="mt-2">Loading order history...</p></div>';
       
-      // Simulate API call
-      setTimeout(() => {
-        const orderHistory = [
-          {
-            id: 'ORD-20240115-0001',
-            date: '2024-01-15',
-            total: 85.8,
-            status: 'Delivered',
-            items: [
-              { name: 'New York Cheesecake', quantity: 1, price: 39.9 },
-              { name: 'Strawberry Shortcake', quantity: 1, price: 36.9 }
-            ]
-          },
-          {
-            id: 'ORD-20240110-0002',
-            date: '2024-01-10',
-            total: 45.9,
-            status: 'Delivered',
-            items: [
-              { name: 'Chocolate Indulgence Cake', quantity: 1, price: 45.9 }
-            ]
+      fetch('index.php?action=get_order_history')
+        .then(response => response.json())
+        .then(data => {
+          if (!data.success) {
+            orderHistoryContainer.innerHTML = `<div class="text-center py-8 text-gray-500"><i class="fa fa-shopping-basket text-4xl mb-2"></i><p>${data.message || 'Unable to load order history'}</p></div>`;
+            return;
           }
-        ];
-        
-        if (orderHistory.length === 0) {
-          orderHistoryContainer.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fa fa-shopping-basket text-4xl mb-2"></i><p>No orders found</p><p class="text-sm">Start shopping to place your first order!</p></div>';
-          return;
-        }
-        
-        orderHistoryContainer.innerHTML = orderHistory.map(order => `
-          <div class="order-card border rounded-lg p-4">
-            <div class="order-header">
-              <div class="flex justify-between items-center">
-                <div>
-                  <h4 class="font-bold">Order #${order.id}</h4>
-                  <p class="text-sm text-gray-600">Date: ${order.date}</p>
-                </div>
-                <span class="status-badge ${
-                  order.status === 'Delivered' ? 'status-delivered' : 
-                  order.status === 'Processing' ? 'status-processing' : 
-                  'status-cancelled'
-                }">${order.status}</span>
-              </div>
-            </div>
-            <div class="order-items mt-3 space-y-2">
-              ${order.items.map(item => `
-                <div class="order-item flex justify-between">
+          
+          const orders = data.orders || [];
+          if (orders.length === 0) {
+            orderHistoryContainer.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fa fa-shopping-basket text-4xl mb-2"></i><p>No orders found</p><p class="text-sm">Start shopping to place your first order!</p></div>';
+            return;
+          }
+          
+          orderHistoryContainer.innerHTML = orders.map(order => `
+            <div class="order-card border rounded-lg p-4">
+              <div class="order-header">
+                <div class="flex justify-between items-center">
                   <div>
-                    <p class="font-medium">${item.name}</p>
-                    <p class="text-sm text-gray-600">Quantity: ${item.quantity}</p>
+                    <h4 class="font-bold">Order #${order.order_id}</h4>
+                    <p class="text-sm text-gray-600">Date: ${order.created_at}</p>
                   </div>
-                  <span class="font-medium">RM${(item.price * item.quantity).toFixed(2)}</span>
+                  <span class="status-badge ${
+                    order.status === 'delivered' ? 'status-delivered' : 
+                    order.status === 'processing' ? 'status-processing' : 
+                    order.status === 'cancelled' ? 'status-cancelled' : 
+                    'status-processing'
+                  }">${order.status}</span>
                 </div>
-              `).join('')}
-              <div class="order-total border-t pt-3 mt-3 flex justify-between font-bold">
-                <span>Total:</span>
-                <span class="text-primary">RM${order.total.toFixed(2)}</span>
+              </div>
+              <div class="order-items mt-3 space-y-2">
+                ${(order.items || []).map(item => `
+                  <div class="order-item flex justify-between">
+                    <div>
+                      <p class="font-medium">${item.item_name}</p>
+                      <p class="text-sm text-gray-600">Quantity: ${item.quantity}</p>
+                    </div>
+                    <span class="font-medium">RM${(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                `).join('')}
+                <div class="order-total border-t pt-3 mt-3 flex justify-between font-bold">
+                  <span>Total:</span>
+                  <span class="text-primary">RM${Number(order.total_amount).toFixed(2)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        `).join('');
-      }, 800);
+          `).join('');
+        })
+        .catch(error => {
+          console.error('Order history error:', error);
+          orderHistoryContainer.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fa fa-shopping-basket text-4xl mb-2"></i><p>Failed to load order history</p></div>';
+        });
     }
     
     // Initialize the application when DOM is loaded
