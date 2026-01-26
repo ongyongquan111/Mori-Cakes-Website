@@ -2,35 +2,50 @@
 /**
  * Mori Cakes - Database Configuration
  *
- * Phase 1 (Local DB on EC2):
- *   DB_HOST=localhost
- *   DB_NAME=mori_cakes
- *   DB_USER=root
- *   DB_PASS=   (empty)
+ * You only need to edit THIS file when moving between phases.
  *
- * Phase 2+ (RDS):
- *   Set environment variables (recommended):
- *     DB_HOST, DB_NAME, DB_USER, DB_PASS
- *
- * Notes:
- * - Keeps coursework-friendly behavior: if DB fails, $pdo becomes null.
- * - No password hashing/encryption is introduced here (uses your existing schema/data).
+ * ------------------------------------------------------------
+ * PHASE 1 (LOCAL DATABASE ON EC2)  ✅ ACTIVE
+ * ------------------------------------------------------------
+ * Uses MariaDB/MySQL installed on the same EC2 instance.
+ * Commands you run in Phase 1 create:
+ *   Database: mori_cakes
+ *   Tables:   imported from /var/www/html/database_schema.sql
  */
+$host     = 'localhost';
+$dbname   = 'mori_cakes';
+$username = 'root';
+$password = '';   // Amazon Linux local MariaDB often has empty root password in labs
 
-$host     = getenv('DB_HOST') ?: 'localhost';
-$dbname   = getenv('DB_NAME') ?: 'mori_cakes';
-$username = getenv('DB_USER') ?: 'root';
-$password = getenv('DB_PASS') ?: '';
+/*
+ * ------------------------------------------------------------
+ * PHASE 2–4 (AMAZON RDS)  🟡 COMMENTED OUT FOR LATER
+ * ------------------------------------------------------------
+ * When you move to RDS, comment the Phase 1 block above and
+ * uncomment + fill in this block.
+ *
+ * Example:
+ * $host     = 'mori-cakes-db.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com';
+ * $dbname   = 'mori_cakes';
+ * $username = 'admin';
+ * $password = 'YOUR_RDS_MASTER_PASSWORD';
+ */
+// $host     = 'YOUR_RDS_ENDPOINT_HERE';
+// $dbname   = 'mori_cakes';
+// $username = 'admin';
+// $password = 'YOUR_RDS_MASTER_PASSWORD';
 
 $pdo = null;
 
 try {
     $dsn = "mysql:host={$host};dbname={$dbname};charset=utf8mb4";
-    $pdo = new PDO($dsn, $username, $password, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
+    $pdo = new PDO($dsn, $username, $password);
+
+    // Sensible defaults (does NOT encrypt your data; it only controls error handling & fetch behavior)
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
+    // Coursework-friendly: keep site running even if DB is down, but log the cause.
     error_log("Database connection error: " . $e->getMessage());
     $pdo = null;
 }

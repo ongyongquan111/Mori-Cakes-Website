@@ -4,6 +4,7 @@ session_start();
 
 // Database configuration
 require_once __DIR__ . '/config.php';
+
 // Get current user session data
 $currentUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 
