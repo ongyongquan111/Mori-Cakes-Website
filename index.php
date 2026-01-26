@@ -2,12 +2,8 @@
 // Mori Cakes PHP Website
 session_start();
 
+// Database configuration
 require_once __DIR__ . '/config.php';
-$pdo = mori_get_pdo();
-if ($pdo === null) {
-    error_log('Database connection not available (Phase-safe config).');
-}
-
 // Get current user session data
 $currentUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 
@@ -120,7 +116,7 @@ function handleLogin($postData) {
         $stmt->execute([$username]);
         $user = $stmt->fetch();
         
-        if ($user && ( $password === $user['password'] || (is_string($user['password']) && str_starts_with($user['password'], '$2') && password_verify($password, $user['password'])) )) {
+        if ($user && $password === $user['password']) {
             $_SESSION['user'] = [
                 'id' => $user['id'],
                 'username' => $user['username'],
