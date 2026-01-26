@@ -1,10 +1,17 @@
 <?php
 session_start();
+
 require_once __DIR__ . '/config.php';
+$pdo = mori_get_pdo();
 
-$isAdminSession = !empty($_SESSION['is_admin']);
+$isAdminSession = false;
+if (isset($_GET['admin']) && $_GET['admin'] === 'true') {
+    $_SESSION['is_admin'] = true;
+}
+if (!empty($_SESSION['is_admin'])) {
+    $isAdminSession = true;
+}
 
-$pdo = null;
 $ordersData = [];
 $productsData = [];
 $usersData = [];
@@ -16,12 +23,12 @@ $editingProduct = null;
 $editingUser = null;
 $editingAdmin = null;
 
-try {
-    if ($pdo === null) {
-        throw new PDOException("Database connection not available");
-    }
+if ($pdo === null) {
+    $flashMessage = 'Database connection not available.';
+    $flashType = 'danger';
+}
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? '';
         $section = $_POST['section'] ?? 'dashboard';
 
@@ -234,15 +241,15 @@ try {
                     header("Location: admin.php?section=" . urlencode($section));
                     exit;
             }
-        } catch (PDOException $e) {
-            error_log("Admin action error: " . $e->getMessage());
-            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Unable to complete the requested action.'];
+
+        } catch (Exception $e) {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Operation failed: ' . $e->getMessage()];
             header("Location: admin.php?section=" . urlencode($section));
             exit;
         }
     }
 
-    $ordersStmt = $pdo->query(
+$ordersStmt = $pdo->query(
         "SELECT o.*, 
                 u.full_name AS customer_name,
                 u.email AS customer_email,
@@ -329,10 +336,6 @@ try {
             }
         }
     }
-} catch (PDOException $e) {
-    error_log("Database connection error: " . $e->getMessage());
-}
-
 if (!empty($_SESSION['flash'])) {
     $flashMessage = $_SESSION['flash']['message'] ?? null;
     $flashType = $_SESSION['flash']['type'] ?? 'success';
