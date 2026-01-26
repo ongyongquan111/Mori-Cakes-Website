@@ -12,7 +12,7 @@
  *   Database: mori_cakes
  *   Tables:   imported from /var/www/html/database_schema.sql
  */
-$host     = 'localhost';
+$host = '127.0.0.1';
 $dbname   = 'mori_cakes';
 $username = 'mori';
 $password = 'mori123';
