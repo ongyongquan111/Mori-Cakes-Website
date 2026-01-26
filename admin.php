@@ -1,18 +1,8 @@
 <?php
 session_start();
+require_once __DIR__ . '/config.php';
 
-$host = 'localhost';
-$dbname = 'mori_cakes';
-$username = 'root';
-$password = '';
-
-$isAdminSession = false;
-if (isset($_GET['admin']) && $_GET['admin'] === 'true') {
-    $_SESSION['is_admin'] = true;
-}
-if (!empty($_SESSION['is_admin'])) {
-    $isAdminSession = true;
-}
+$isAdminSession = !empty($_SESSION['is_admin']);
 
 $pdo = null;
 $ordersData = [];
@@ -27,9 +17,9 @@ $editingUser = null;
 $editingAdmin = null;
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    if ($pdo === null) {
+        throw new PDOException("Database connection not available");
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? '';

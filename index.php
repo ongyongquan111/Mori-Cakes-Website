@@ -2,20 +2,7 @@
 // Mori Cakes PHP Website
 session_start();
 
-// Database configuration
-$host = 'localhost';
-$dbname = 'mori_cakes';
-$username = 'root';
-$password = '';
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Database connection error: " . $e->getMessage());
-    $pdo = null;
-}
+require_once __DIR__ . '/config.php';
 
 // Get current user session data
 $currentUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
