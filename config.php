@@ -14,8 +14,8 @@
  */
 $host     = 'localhost';
 $dbname   = 'mori_cakes';
-$username = 'root';
-$password = '';   // Amazon Linux local MariaDB often has empty root password in labs
+$username = 'mori';
+$password = 'mori123';
 
 /*
  * ------------------------------------------------------------
