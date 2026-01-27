@@ -839,7 +839,7 @@ if (!empty($_SESSION['flash'])) {
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Free Delivery Threshold</label>
-                                    <input type="number" value="100" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
+                                    <input type="number" value="0" class="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-500" readonly>
                                 </div>
                             </div>
                         </div>
