@@ -1,25 +1,6 @@
 <?php
 session_start();
 
-// Logout handler: destroy session and admin cookie before redirecting.
-if (isset($_GET['action']) && $_GET['action'] === 'logout') {
-    // Clear all session variables
-    $_SESSION = [];
-
-    // Delete session cookie
-    if (ini_get('session.use_cookies')) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
-    }
-
-    // Delete our admin-stability cookie (used behind ALB/ASG)
-    setcookie('mori_is_admin', '', time() - 42000, '/');
-
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
 require_once __DIR__ . '/config.php';
 
 $isAdminSession = false;
@@ -576,7 +557,7 @@ if (!empty($_SESSION['flash'])) {
                 </a>
             </nav>
             <div class="absolute bottom-0 left-0 w-64 p-6">
-                <a href="admin.php?action=logout" class="flex items-center text-white hover:text-pink-100 transition-colors">
+                <a href="index.php" class="flex items-center text-white hover:text-pink-100 transition-colors">
                     <i class="fa fa-sign-out w-6"></i>
                     <span>Logout</span>
                 </a>
@@ -627,7 +608,7 @@ if (!empty($_SESSION['flash'])) {
                         <i class="fa fa-cog w-6"></i>
                         <span>Settings</span>
                     </a>
-                    <a href="admin.php?action=logout" class="flex items-center px-6 py-3 text-white hover:bg-white hover:bg-opacity-10 transition-colors" onclick="closeMobileMenu()">
+                    <a href="index.php" class="flex items-center px-6 py-3 text-white hover:bg-white hover:bg-opacity-10 transition-colors" onclick="closeMobileMenu()">
                         <i class="fa fa-sign-out w-6"></i>
                         <span>Logout</span>
                     </a>
