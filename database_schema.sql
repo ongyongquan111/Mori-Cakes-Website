@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS orders (
     delivery_date DATE NOT NULL,
     delivery_time VARCHAR(50) NOT NULL,
     special_instructions TEXT,
-    status ENUM('pending', 'confirmed', 'processing', 'delivered', 'cancelled') DEFAULT 'pending',
+    status ENUM('pending', 'processing', 'delivered', 'cancelled') DEFAULT 'pending',
     payment_method VARCHAR(50),
     payment_status ENUM('unpaid', 'paid') DEFAULT 'unpaid',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
