@@ -839,7 +839,7 @@ $allMenuItems = getMenuItems();
             <span class="font-medium text-dark">RM<span id="cart-subtotal">0.00</span></span>
           </div>
           <div class="flex justify-between items-center">
-            <span class="text-gray-600">Delivery Fee:</span>
+            <span class="text-gray-600">Delivery Fee (≥RM100 No Charge):</span>
             <span class="font-medium text-dark">RM<span id="delivery-fee">12.00</span></span>
           </div>
           <div class="flex justify-between items-center border-t pt-3">
