@@ -1,12 +1,42 @@
 <?php
 session_start();
 
+// Logout handler: destroy session and admin cookie before redirecting.
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    // Clear all session variables
+    $_SESSION = [];
+
+    // Delete session cookie
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+
+    // Delete our admin-stability cookie (used behind ALB/ASG)
+    setcookie('mori_is_admin', '', time() - 42000, '/');
+
+    session_destroy();
+    header('Location: index.php');
+    exit;
+}
+
 require_once __DIR__ . '/config.php';
 
 $isAdminSession = false;
+
+// Simple admin gate for the student lab:
+// - session is fine on single instance
+// - cookie keeps admin access stable behind ALB/ASG (sessions are instance-local by default)
 if (isset($_GET['admin']) && $_GET['admin'] === 'true') {
     $_SESSION['is_admin'] = true;
+    // 24 hours
+    setcookie('mori_is_admin', '1', time() + 86400, '/', '', false, true);
 }
+
+if (!empty($_COOKIE['mori_is_admin']) && $_COOKIE['mori_is_admin'] === '1' && empty($_SESSION['is_admin'])) {
+    $_SESSION['is_admin'] = true;
+}
+
 if (!empty($_SESSION['is_admin'])) {
     $isAdminSession = true;
 }
@@ -29,6 +59,10 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? '';
         $section = $_POST['section'] ?? 'dashboard';
+
+        $isAjax = (!empty($_POST['ajax']) && $_POST['ajax'] === '1')
+            || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+            || (!empty($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
 
         try {
             switch ($action) {
@@ -233,6 +267,45 @@ try {
                     $_SESSION['flash'] = ['type' => 'success', 'message' => 'Admin account deleted successfully.'];
                     header("Location: admin.php?section=admins");
                     exit;
+                case 'update_order_status':
+                    if (!$isAdminSession) {
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+                            exit;
+                        }
+                        $_SESSION['flash'] = ['type' => 'error', 'message' => 'Unauthorized.'];
+                        header("Location: index.php");
+                        exit;
+                    }
+
+                    $orderId = (int) ($_POST['order_id'] ?? 0);
+                    $newStatus = trim($_POST['status'] ?? '');
+
+                    $allowedStatuses = ['pending', 'confirmed', 'processing', 'delivered', 'cancelled'];
+                    if ($orderId <= 0 || !in_array($newStatus, $allowedStatuses, true)) {
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            echo json_encode(['success' => false, 'message' => 'Invalid order or status']);
+                            exit;
+                        }
+                        $_SESSION['flash'] = ['type' => 'error', 'message' => 'Invalid order or status.'];
+                        header("Location: admin.php?section=orders");
+                        exit;
+                    }
+
+                    $stmt = $pdo->prepare("UPDATE orders SET status = :status WHERE id = :id");
+                    $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
+
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode(['success' => true]);
+                        exit;
+                    }
+
+                    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Order status updated successfully.'];
+                    header("Location: admin.php?section=orders");
+                    exit;
 
                 default:
                     $_SESSION['flash'] = ['type' => 'error', 'message' => 'Unknown action requested.'];
@@ -241,6 +314,13 @@ try {
             }
         } catch (PDOException $e) {
             error_log("Admin action error: " . $e->getMessage());
+
+            if (!empty($isAjax)) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Unable to complete the requested action.']);
+                exit;
+            }
+
             $_SESSION['flash'] = ['type' => 'error', 'message' => 'Unable to complete the requested action.'];
             header("Location: admin.php?section=" . urlencode($section));
             exit;
@@ -496,7 +576,7 @@ if (!empty($_SESSION['flash'])) {
                 </a>
             </nav>
             <div class="absolute bottom-0 left-0 w-64 p-6">
-                <a href="index.php" class="flex items-center text-white hover:text-pink-100 transition-colors">
+                <a href="admin.php?action=logout" class="flex items-center text-white hover:text-pink-100 transition-colors">
                     <i class="fa fa-sign-out w-6"></i>
                     <span>Logout</span>
                 </a>
@@ -547,7 +627,7 @@ if (!empty($_SESSION['flash'])) {
                         <i class="fa fa-cog w-6"></i>
                         <span>Settings</span>
                     </a>
-                    <a href="index.php" class="flex items-center px-6 py-3 text-white hover:bg-white hover:bg-opacity-10 transition-colors" onclick="closeMobileMenu()">
+                    <a href="admin.php?action=logout" class="flex items-center px-6 py-3 text-white hover:bg-white hover:bg-opacity-10 transition-colors" onclick="closeMobileMenu()">
                         <i class="fa fa-sign-out w-6"></i>
                         <span>Logout</span>
                     </a>
@@ -1756,30 +1836,167 @@ if (!empty($_SESSION['flash'])) {
             document.getElementById('order-detail-modal').classList.add('hidden');
         }
 
-        // Update order status
-        function updateOrderStatus(orderId) {
+        // Update order status (persist to DB)
+        async function updateOrderStatus(orderId) {
             const order = orders.find(o => o.id === orderId);
             if (!order) return;
 
-            const newStatus = prompt('Enter new status (pending, processing, delivered, cancelled):', order.status);
-            if (newStatus && ['pending', 'processing', 'delivered', 'cancelled'].includes(newStatus)) {
-                order.status = newStatus;
+            const allowed = ['pending', 'confirmed', 'processing', 'delivered', 'cancelled'];
+            const current = (order.status || '').toLowerCase();
+
+            const newStatus = prompt(
+                `Enter new status (${allowed.join(', ')}):`,
+                allowed.includes(current) ? current : 'pending'
+            );
+
+            if (!newStatus) return;
+
+            const normalized = newStatus.trim().toLowerCase();
+            if (!allowed.includes(normalized)) {
+                alert(`Invalid status. Please use one of: ${allowed.join(', ')}`);
+                return;
+            }
+
+            try {
+                const body = new URLSearchParams();
+                body.append('action', 'update_order_status');
+                body.append('section', 'orders');
+                body.append('order_id', String(orderId));
+                body.append('status', normalized);
+                body.append('ajax', '1');
+
+                const resp = await fetch('admin.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString()
+                });
+
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data.success) {
+                    alert(data.message || 'Failed to update order status.');
+                    return;
+                }
+
+                order.status = normalized;
                 alert('Order status updated successfully!');
+
                 // Refresh order lists
                 loadRecentOrders();
                 loadAllOrders();
+
                 // If order detail modal is open, refresh it
                 if (!document.getElementById('order-detail-modal').classList.contains('hidden')) {
                     viewOrderDetail(orderId);
                 }
-            } else {
-                alert('Invalid status. Please use one of: pending, processing, delivered, cancelled');
+            } catch (err) {
+                console.error(err);
+                alert('Failed to update order status (network/server error).');
             }
         }
 
-        // Print order
+        // Print order (opens a print-friendly window)
         function printOrder(orderId) {
-            alert('Printing order... This would open the print dialog in a real application.');
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const w = window.open('', '_blank', 'width=900,height=650');
+            if (!w) {
+                alert('Popup blocked. Please allow popups to print the order.');
+                return;
+            }
+
+            const fmtMoney = (n) => `RM${Number(n || 0).toFixed(2)}`;
+            const itemsRows = (order.items || []).map(item => `
+                <tr>
+                    <td style="padding:8px;border-bottom:1px solid #eee;">${item.name || ''}</td>
+                    <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">${fmtMoney(item.price)}</td>
+                    <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${Number(item.quantity || 0)}</td>
+                    <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">${fmtMoney((Number(item.price || 0) * Number(item.quantity || 0)))}</td>
+                </tr>
+            `).join('');
+
+            const total = Number(order.total || order.total_amount || 0);
+
+            const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Print Order ${order.order_id || order.id}</title>
+  <style>
+    body{font-family:Arial, sans-serif; margin:24px; color:#111;}
+    h1{margin:0 0 4px 0; font-size:20px;}
+    .muted{color:#555; font-size:12px;}
+    .box{border:1px solid #eee; border-radius:10px; padding:14px; margin-top:14px;}
+    table{width:100%; border-collapse:collapse; margin-top:10px;}
+    th{padding:8px; text-align:left; border-bottom:2px solid #ddd; font-size:12px; color:#444;}
+    .right{text-align:right;}
+    .center{text-align:center;}
+    @media print { .no-print{display:none;} }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:right;margin-bottom:10px;">
+    <button onclick="window.print()" style="padding:8px 12px;">Print</button>
+  </div>
+
+  <h1>Mori Cakes - Order Receipt</h1>
+  <div class="muted">Order: <strong>${order.order_id || ('ORD-' + order.id)}</strong> • Date: ${order.created_at || ''}</div>
+
+  <div class="box">
+    <div style="display:flex; gap:18px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:260px;">
+        <strong>Customer</strong><br>
+        ${order.customer_name || order.recipient_name || ''}<br>
+        ${order.customer_email || ''}<br>
+        ${order.customer_phone || order.recipient_phone || ''}
+      </div>
+      <div style="flex:1; min-width:260px;">
+        <strong>Delivery</strong><br>
+        Date: ${order.delivery_date || ''}<br>
+        Time: ${order.delivery_time || ''}<br>
+        Address: ${order.customer_address || order.recipient_address || ''}
+      </div>
+      <div style="flex:1; min-width:200px;">
+        <strong>Status</strong><br>
+        ${order.status || ''}<br><br>
+        <strong>Payment</strong><br>
+        ${order.payment_method || ''} (${order.payment_status || ''})
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th class="right">Price</th>
+          <th class="center">Qty</th>
+          <th class="right">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows || '<tr><td colspan="4" style="padding:10px;color:#777;">No items</td></tr>'}
+        <tr>
+          <td colspan="3" class="right" style="padding:10px;font-weight:bold;">Total</td>
+          <td class="right" style="padding:10px;font-weight:bold;">${fmtMoney(total)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    ${order.special_instructions ? `<div style="margin-top:12px;"><strong>Notes:</strong> ${order.special_instructions}</div>` : ''}
+  </div>
+
+  <script>
+    window.onload = function() {
+      window.focus();
+      window.print();
+    };
+  </script>
+</body>
+</html>`;
+
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
         }
 
         // Load products
@@ -1795,7 +2012,7 @@ if (!empty($_SESSION['flash'])) {
                             <span class="text-sm text-gray-500">Stock: ${product.stock ?? 0}</span>
                         </div>
                         <div class="flex space-x-2">
-                            <a class="btn-primary text-sm flex-1 text-center" href="admin.php?section=products&edit_product_id=${product.id}">
+                            <a class="btn-primary text-sm flex-1 text-center" href="admin.php?admin=true&section=products&edit_product_id=${product.id}">
                                 <i class="fa fa-edit mr-1"></i> Edit
                             </a>
                             <form method="post" action="admin.php">
