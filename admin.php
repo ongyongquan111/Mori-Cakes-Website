@@ -282,7 +282,7 @@ try {
                     $orderId = (int) ($_POST['order_id'] ?? 0);
                     $newStatus = trim($_POST['status'] ?? '');
 
-                    $allowedStatuses = ['pending', 'confirmed', 'processing', 'delivered', 'cancelled'];
+                    $allowedStatuses = ['pending', 'processing', 'delivered', 'cancelled'];
                     if ($orderId <= 0 || !in_array($newStatus, $allowedStatuses, true)) {
                         if ($isAjax) {
                             header('Content-Type: application/json; charset=utf-8');
@@ -575,7 +575,7 @@ if (!empty($_SESSION['flash'])) {
                     <span>Settings</span>
                 </a>
             </nav>
-            <div class="absolute bottom-0 left-0 w-64 p-6">
+            <div class="absolute bottom-0 left-0 w-64 p-6" style="position: fixed;">
                 <a href="admin.php?action=logout" class="flex items-center text-white hover:text-pink-100 transition-colors">
                     <i class="fa fa-sign-out w-6"></i>
                     <span>Logout</span>
@@ -1841,7 +1841,7 @@ if (!empty($_SESSION['flash'])) {
             const order = orders.find(o => o.id === orderId);
             if (!order) return;
 
-            const allowed = ['pending', 'confirmed', 'processing', 'delivered', 'cancelled'];
+            const allowed = ['pending', 'processing', 'delivered', 'cancelled'];
             const current = (order.status || '').toLowerCase();
 
             const newStatus = prompt(
